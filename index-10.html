@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="it"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Asta Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: single phone column. Home = featured sushi tile + colour grid of 20 scenarios.
+   Auction = two player panels, the item on the block, price stepper, assign/skip. Result = reveal + winner. */
+:root{
+  --bg:#0F2233; --surface:#18334A; --surface2:#21435F; --ink:#F4F7FA; --muted:#9FB6C8; --line:#2D5273;
+  --accent:#FF5A5F; --on-accent:#1B0A0B;
+  --p1:#4CC9F0; --on-p1:#06202E; --p2:#FFC043; --on-p2:#2B1D00;
+  --good:#3DDC97; --bad:#FF7A7A; --tile-ink:#0B1A26;
+  --font-display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF4F8; --surface:#FFFFFF; --surface2:#E1ECF4; --ink:#10283B; --muted:#51697C; --line:#C5D6E2;
+    --accent:#E63946; --on-accent:#FFFFFF;
+    --p1:#0B86B8; --on-p1:#FFFFFF; --p2:#F2A900; --on-p2:#2B1D00;
+    --good:#119865; --bad:#D63B3B; color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EEF4F8; --surface:#FFFFFF; --surface2:#E1ECF4; --ink:#10283B; --muted:#51697C; --line:#C5D6E2;
+  --accent:#E63946; --on-accent:#FFFFFF;
+  --p1:#0B86B8; --on-p1:#FFFFFF; --p2:#F2A900; --on-p2:#2B1D00;
+  --good:#119865; --bad:#D63B3B; color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.4;padding-inline:16px;padding-block:14px 40px}
+#app{max-width:480px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* home */
+.hero h1{font-size:40px;font-weight:800;line-height:1}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:34ch}
+.rules{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--surface2);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:500}
+.card{background:var(--surface);border-radius:18px;padding:14px}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.names label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.names input{width:100%;min-width:0;background:var(--surface2);border:2px solid var(--line);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.d0{background:var(--p1)}.d1{background:var(--p2)}
+.night{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.score{font-family:var(--font-display);font-size:34px;font-weight:800;display:flex;gap:10px;align-items:baseline}
+.score .a{color:var(--p1)}.score .b{color:var(--p2)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;text-align:left;border:0;border-radius:18px;padding:14px;min-height:118px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;
+  background:hsl(var(--h) 85% 62%);color:var(--tile-ink);transition:transform .12s}
+.tile:active{transform:scale(.97)}
+.tile-name{font-family:var(--font-display);font-weight:800;font-size:19px;line-height:1.05;overflow-wrap:anywhere}
+.tile-scen{font-size:12.5px;line-height:1.25;opacity:.85}
+.tile-meta{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:700}
+.tile.feat{grid-column:1/-1;min-height:150px;background:hsl(var(--h) 90% 64%)}
+.tile.feat .tile-name{font-size:30px}
+.tile.feat::after{content:"Si parte da qui";position:absolute;top:12px;right:12px;background:var(--tile-ink);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px}
+.win{display:inline-flex;align-items:center;gap:5px;background:var(--tile-ink);color:#fff;border-radius:999px;padding:3px 9px;font-size:11px}
+.win i{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+/* auction */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.topbar h2{font-size:20px;flex:1;min-width:0}
+.ghost{background:transparent;border:2px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:600;font-size:13.5px}
+.ghost:disabled{opacity:.35;cursor:default}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pl{background:var(--surface);border-radius:16px;padding:12px;border-top:5px solid var(--c);display:flex;flex-direction:column;gap:8px;min-width:0;outline:3px solid transparent;transition:outline-color .2s}
+.pl.turn{outline-color:var(--c)}
+.pl-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-bud{font-family:var(--font-display);font-size:34px;font-weight:800;line-height:1}
+.bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--c);transition:width .35s}
+.slots{display:flex;gap:5px}
+.slot{flex:1;height:10px;border-radius:4px;background:var(--surface2)}
+.slot.on{background:var(--c)}
+.pl-foot{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.block{background:var(--surface);border-radius:22px;padding:18px 16px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.banner{border-radius:999px;padding:7px 14px;font-weight:700;font-size:13.5px;align-self:center;background:var(--c);color:var(--on);}
+.item{font-family:var(--font-display);font-weight:800;font-size:34px;line-height:1.05;overflow-wrap:anywhere;animation:pop .35s ease-out;min-height:2.1em;display:flex;align-items:center;justify-content:center}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.stepper{display:flex;align-items:center;justify-content:center;gap:14px}
+.step{width:52px;height:52px;border-radius:50%;border:0;background:var(--surface2);font-size:26px;font-weight:700}
+.step:disabled{opacity:.3}
+.price{font-family:var(--font-display);font-size:48px;font-weight:800;min-width:3.2ch}
+.quick{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.quick button{border:2px solid var(--line);background:transparent;border-radius:999px;padding:6px 14px;font-weight:700}
+.quick button.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.quick button:disabled{opacity:.3}
+.assign{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:16px;padding:14px 10px;font-weight:800;font-size:16px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;min-height:60px}
+.btn small{font-weight:500;font-size:11.5px;opacity:.8}
+.btn:disabled{opacity:.3;cursor:default}
+.b0{background:var(--p1);color:var(--on-p1)}.b1{background:var(--p2);color:var(--on-p2)}
+.btn.skip{background:transparent;border:2px dashed var(--muted);color:var(--ink);flex-direction:row;justify-content:center;gap:8px;width:100%}
+.progress{font-size:12.5px;color:var(--muted)}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.team{background:var(--surface);border-radius:16px;padding:12px;min-width:0}
+.team h3{font-size:15px;margin-bottom:8px;display:flex;align-items:center}
+.team ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.team li{display:flex;justify-content:space-between;gap:6px;font-size:13px;min-width:0}
+.team li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team li.empty{color:var(--muted)}
+
+/* result */
+.verdict{text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.verdict h1{font-size:40px;font-weight:800;line-height:1}
+.crown{font-family:var(--font-display);font-weight:800;border-radius:999px;padding:6px 16px;background:var(--c);color:var(--on)}
+.rteams{display:flex;flex-direction:column;gap:12px}
+.rteam{background:var(--surface);border-radius:18px;padding:14px;border-left:6px solid var(--c)}
+.rteam-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.rteam-head h3{font-size:20px}
+.rteam-score{font-family:var(--font-display);font-size:30px;font-weight:800;color:var(--c)}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line);opacity:0;animation:rev .45s ease-out forwards;animation-delay:var(--d)}
+@keyframes rev{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.row b{font-weight:700;overflow-wrap:anywhere}
+.stars{color:var(--p2);letter-spacing:1px;white-space:nowrap;text-align:right}
+.row small{color:var(--muted)}
+.sum{font-size:12.5px;color:var(--muted);margin-top:6px}
+.badges{display:grid;gap:10px}
+.badge{background:var(--surface2);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.badge b{font-family:var(--font-display);font-size:16px}
+.cta{display:flex;flex-direction:column;gap:10px}
+.btn.main{background:var(--accent);color:var(--on-accent);flex-direction:row;justify-content:center;width:100%}
+.btn.alt{background:var(--surface2);color:var(--ink);flex-direction:row;justify-content:center;width:100%}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;z-index:60;animation:pop .25s ease-out;max-width:90vw;text-align:center}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .row{opacity:1}
+}
+</style>
+</head><body>
+<div id="app"></div>
+<canvas id="confetti" hidden></canvas>
+<script>
+var RAW=[
+['sushi','Menù sushi','5 pezzi per la serata con lo chef sushi',`Nigiri salmone|4
+Nigiri tonno|4
+Nigiri gambero|3
+Nigiri anguilla|4
+Nigiri branzino|3
+Nigiri capasanta|4
+Nigiri toro (ventresca di tonno)|5
+Nigiri tamago|2
+Uramaki California|3
+Uramaki Philadelphia|3
+Uramaki Spicy Tuna|4
+Uramaki Dragon|4
+Hosomaki cetriolo|1
+Hosomaki tonno|3
+Hosomaki salmone|3
+Futomaki vegetariano|2
+Temaki salmone e avocado|4
+Gunkan uova di salmone|4
+Gunkan ricci di mare|5
+Sashimi di salmone|4
+Sashimi di tonno|4
+Tartare di tonno|4
+Tempura di gamberi|4
+Hot roll fritto|3
+Gyoza di maiale|3
+Edamame|2`],
+['film','Maratona film','5 film per 5 serate di fila',`Il Padrino|5
+Pulp Fiction|5
+Forrest Gump|4
+Interstellar|5
+Il Signore degli Anelli: La Compagnia dell'Anello|5
+Matrix|5
+Il Gladiatore|4
+Ritorno al futuro|5
+Shrek|4
+Titanic|3
+Inception|5
+Il Re Leone|4
+Fight Club|5
+Jurassic Park|5
+Star Wars: Una nuova speranza|5
+Harry Potter e la pietra filosofale|4
+Pirati dei Caraibi: La maledizione della prima luna|4
+Quasi amici|4
+La vita è bella|5
+Mamma ho perso l'aereo|3
+Scarface|4
+Quei bravi ragazzi|5
+Parasite|4
+Una notte da leoni|3
+Top Gun: Maverick|4`],
+['sport','Settimana sportiva','5 sport, uno per ogni giorno lavorativo',`Padel|4
+Calcetto|4
+Nuoto|3
+Tennis|4
+Basket|4
+Corsa|3
+Boxe|4
+Arrampicata|4
+Pallavolo|3
+Yoga|2
+Spinning|3
+CrossFit|3
+Surf|5
+Sci|5
+Golf|3
+Ping pong|2
+Rugby|4
+Judo|3
+Scherma|3
+Skateboard|3
+Bouldering|4
+Beach volley|4
+Calcio a 11|4
+Karate|3
+Ciclismo su strada|3`],
+['auto','Garage dei sogni','5 auto nel tuo garage',`Ferrari F40|5
+Lamborghini Countach|5
+Porsche 911 Carrera|5
+Fiat 500 d'epoca|3
+Alfa Romeo Giulia GTA|5
+Mini Cooper|3
+Tesla Model S Plaid|4
+Jeep Wrangler|3
+Mercedes Classe G|4
+DeLorean DMC-12|4
+Ford Mustang Fastback del '68|5
+Land Rover Defender|4
+Maserati MC20|5
+Lancia Delta Integrale|5
+Volkswagen Maggiolino|3
+Aston Martin DB5|5
+Fiat Panda 4x4|2
+BMW M3 E30|4
+Toyota Supra|4
+Nissan GT-R|4
+Range Rover|3
+Audi RS6 Avant|4
+Ape Piaggio|2
+Bugatti Chiron|5`],
+['festival','Festival musicale','5 artisti in line-up, di tutti i generi',`Queen|5
+Coldplay|4
+Daft Punk|5
+Red Hot Chili Peppers|5
+Metallica|4
+Beyoncé|5
+Arctic Monkeys|4
+Pink Floyd|5
+Muse|4
+Dua Lipa|4
+Rihanna|4
+Kendrick Lamar|5
+The Weeknd|4
+Imagine Dragons|3
+Oasis|5
+Nirvana|5
+AC/DC|5
+Guns N' Roses|4
+Linkin Park|4
+Bob Marley|5
+Calvin Harris|3
+Billie Eilish|4
+Radiohead|4
+Gorillaz|4
+Måneskin|4`],
+['calcetto','Squadra di calcetto','5 calciatori per la tua squadra',`Maradona|5
+Pelé|5
+Messi|5
+Cristiano Ronaldo|5
+Ronaldinho|5
+Zidane|5
+Totti|4
+Roberto Baggio|5
+Del Piero|4
+Buffon|5
+Maldini|5
+Cruyff|5
+Ronaldo il Fenomeno|5
+Neymar|4
+Mbappé|5
+Haaland|5
+Modrić|4
+Pirlo|5
+Gattuso|3
+Cannavaro|4
+Ibrahimović|5
+Cassano|3
+Iniesta|5
+Van Basten|5
+Henry|5`],
+['cena','Cena a 5 portate','Antipasto, primo, secondo, contorno e dolce',`Carbonara|5
+Lasagna|5
+Tiramisù|5
+Parmigiana di melanzane|5
+Bruschetta al pomodoro|3
+Risotto ai funghi|4
+Cotoletta alla milanese|4
+Tagliata di manzo|4
+Patate al forno|3
+Insalata caprese|3
+Panna cotta|4
+Cacio e pepe|5
+Arancini|4
+Tagliatelle al ragù|5
+Polpette al sugo|4
+Fiorentina|5
+Cannoli siciliani|5
+Prosciutto e melone|3
+Insalata mista|1
+Gelato affogato|4
+Gnocchi al gorgonzola|3
+Vitello tonnato|4
+Saltimbocca alla romana|4
+Verdure grigliate|2
+Frittura di paranza|4`],
+['pizza','Giro d\'Italia in pizza','5 pizze per una serata con gli amici',`Margherita|4
+Marinara|3
+Diavola|4
+Quattro formaggi|4
+Capricciosa|3
+Quattro stagioni|3
+Napoli|3
+Prosciutto e funghi|3
+Bufala e pomodorini|4
+Ortolana|2
+Pizza fritta|4
+Calzone|4
+Wurstel e patatine|2
+Crudo e rucola|4
+Pizza alla Nutella|3
+Boscaiola|3
+Salsiccia e friarielli|5
+Tonno e cipolla|3
+Carbonara in pizza|4
+Pizza con l'ananas|1
+Pizza bianca romana|4
+Focaccia di Recco|4
+Pinsa romana|4
+Burrata e mortadella|5`],
+['tour','Tour del mondo','5 città in cui vivere un anno ciascuna',`Tokyo|5
+New York|5
+Parigi|5
+Londra|4
+Barcellona|5
+Sydney|4
+Rio de Janeiro|4
+Dubai|3
+Bangkok|4
+Città del Capo|4
+Los Angeles|4
+Lisbona|5
+Berlino|4
+Amsterdam|4
+Singapore|4
+Ubud, Bali|5
+Istanbul|4
+Marrakech|4
+Buenos Aires|4
+Reykjavik|3
+Vancouver|4
+Seoul|4
+Roma|5
+Miami|4
+Copenaghen|4`],
+['vacanza','Vacanza itinerante','5 tappe in 5 paesi diversi',`Giappone|5
+Islanda|5
+Thailandia|4
+Grecia|5
+Messico|4
+Portogallo|4
+Norvegia|4
+Marocco|4
+Stati Uniti on the road|5
+Australia|4
+Nuova Zelanda|5
+Perù|4
+Vietnam|4
+Croazia|4
+Spagna|4
+Egitto|4
+Maldive|5
+Sudafrica|4
+Canada|4
+Argentina|4
+Turchia|4
+Scozia|4
+Cuba|3
+Kenya, safari|5
+Indonesia|4`],
+['serie','Binge di un mese','5 serie TV da divorare',`Breaking Bad|5
+Game of Thrones|5
+Peaky Blinders|5
+Friends|5
+The Office US|5
+Stranger Things|4
+Black Mirror|4
+La casa di carta|3
+Gomorra|4
+Squid Game|4
+The Crown|3
+Dark|5
+Suits|4
+How I Met Your Mother|4
+Narcos|4
+The Last of Us|5
+Succession|5
+Boris|5
+Lupin|3
+Better Call Saul|5
+The Bear|5
+Chernobyl|5
+Vikings|4
+Sherlock|5
+Rick and Morty|5`],
+['console','Serata console','5 videogiochi per giocare tutti insieme',`Mario Kart|5
+EA Sports FC|4
+Super Smash Bros|5
+Fortnite|3
+Mario Party|4
+Overcooked|4
+Just Dance|3
+Rocket League|4
+Call of Duty|4
+GTA V|5
+Minecraft|4
+Tekken|4
+Street Fighter|4
+Crash Team Racing|4
+Pro Evolution Soccer|4
+It Takes Two|5
+Tetris|3
+Jackbox Party Pack|4
+Wii Sports Tennis|4
+Mortal Kombat|4
+Among Us|3
+Fall Guys|3
+Super Mario Bros. Wonder|4
+Zelda: Breath of the Wild|5`],
+['zoo','Zoo in giardino','5 animali da tenere a casa tua',`Panda|4
+Leone|5
+Elefante|4
+Pinguino|4
+Giraffa|3
+Tigre|5
+Delfino|4
+Lama|3
+Capibara|5
+Koala|4
+Lupo|4
+Aquila reale|4
+Gorilla|4
+Pappagallo ara|3
+Rinoceronte|3
+Orso polare|4
+Volpe fennec|4
+Suricato|4
+Tartaruga gigante|3
+Ippopotamo|3
+Axolotl|3
+Camaleonte|3
+Cavallo|4
+Fenicottero|3
+Squalo bianco in piscina|5`],
+['storia','Cena con la storia','5 personaggi seduti al tuo tavolo',`Leonardo da Vinci|5
+Napoleone|4
+Cleopatra|4
+Giulio Cesare|4
+Albert Einstein|5
+Cristoforo Colombo|3
+Michelangelo|4
+Galileo Galilei|4
+Nikola Tesla|5
+Marco Polo|4
+Mozart|4
+Marie Curie|5
+Dante Alighieri|4
+Nelson Mandela|5
+Winston Churchill|4
+Gandhi|4
+Steve Jobs|4
+Freddie Mercury|5
+Muhammad Ali|5
+Alessandro Magno|5
+Machiavelli|3
+Caravaggio|4
+Frida Kahlo|4
+Elvis Presley|4
+Charlie Chaplin|4`],
+['cocktail','Aperitivo cocktail','5 cocktail per la tua serata',`Spritz|4
+Negroni|5
+Mojito|4
+Margarita|4
+Gin Tonic|4
+Moscow Mule|3
+Daiquiri|3
+Cosmopolitan|3
+Old Fashioned|4
+Piña Colada|3
+Hugo|3
+Americano|3
+Long Island|3
+Caipirinha|3
+Bellini|3
+Espresso Martini|4
+Mai Tai|3
+Whisky Sour|4
+Sex on the Beach|2
+Tequila Sunrise|3
+Manhattan|4
+Bloody Mary|3
+Campari Soda|3
+Rum e Cola|2
+Negroni sbagliato|4`],
+['armadio','Armadio capsula','5 marchi per vestirti tutto l\'anno',`Nike|5
+Adidas|4
+Zara|3
+Levi's|4
+Ralph Lauren|4
+Gucci|4
+Prada|4
+Stone Island|4
+C.P. Company|3
+Moncler|4
+The North Face|4
+Carhartt|4
+Patagonia|4
+Lacoste|3
+Fred Perry|3
+H&M|2
+Uniqlo|3
+Diesel|3
+Armani|4
+Supreme|3
+Off-White|3
+New Balance|4
+Converse|4
+Vans|3
+Dr. Martens|3
+Ray-Ban|4`],
+['gelato','Gelateria','5 gusti per il tuo cono perfetto',`Pistacchio|5
+Cioccolato fondente|4
+Nocciola|5
+Stracciatella|4
+Fior di latte|3
+Limone|3
+Fragola|3
+Cookies|4
+Bacio|4
+Crema|3
+Tiramisù|4
+Caffè|3
+Malaga|3
+Menta|2
+Cocco|3
+Mandorla|3
+Zuppa inglese|3
+Vaniglia|2
+Dulce de leche|4
+Amarena|4
+Mango|3
+Cioccolato bianco|3
+Ricotta e pera|3
+Gianduia|5
+Cheesecake|4`],
+['snack','Pausa pranzo da campioni','5 snack e dolci per una settimana',`Nutella|5
+Kinder Bueno|5
+Oreo|4
+Pringles|4
+Ringo|3
+Baci Perugina|4
+Pocket Coffee|4
+Brioche alla crema|4
+Taralli|3
+Fonzies|3
+TUC|3
+Pan di Stelle|4
+Cornetto Algida|5
+Twix|4
+Snickers|4
+Bounty|2
+Haribo|4
+Maxibon|4
+Girella|3
+Tronky|3
+Mikado|3
+Noccioline|2
+Mela|1
+Barretta proteica|2
+Popcorn|3`],
+['eroi','Squadra di supereroi','5 eroi o villain per la battaglia finale',`Batman|5
+Superman|4
+Spider-Man|5
+Iron Man|5
+Wonder Woman|4
+Wolverine|5
+Hulk|4
+Thor|4
+Capitan America|4
+Black Panther|4
+Joker|5
+Thanos|5
+Deadpool|5
+Flash|3
+Aquaman|2
+Doctor Strange|4
+Magneto|4
+Loki|4
+Darth Vader|5
+Gandalf|5
+Goku|5
+Venom|4
+Daredevil|3
+Catwoman|3
+Ant-Man|2`],
+['cartoni','Pomeriggio cartoni','5 cartoni della tua infanzia',`Dragon Ball|5
+One Piece|5
+Naruto|5
+Pokémon|5
+I Simpson|5
+Holly e Benji|5
+Tom & Jerry|4
+SpongeBob|4
+Looney Tunes|4
+Doraemon|4
+Sailor Moon|4
+Beyblade|3
+Digimon|4
+Yu-Gi-Oh!|4
+Pingu|3
+Gormiti|3
+Winx|3
+I Griffin|4
+South Park|4
+I Cavalieri dello Zodiaco|5
+Lupin III|4
+Mila e Shiro|3
+Tartarughe Ninja|4
+Ben 10|3
+Il laboratorio di Dexter|4
+Scooby-Doo|4`],
+['cantanti','Tour italiano','5 artisti per un tour immaginario',`Vasco Rossi|5
+Ligabue|4
+Laura Pausini|4
+Eros Ramazzotti|4
+Jovanotti|5
+Cesare Cremonini|4
+Max Pezzali|4
+Tiziano Ferro|4
+Zucchero|4
+Elisa|3
+Lucio Battisti|5
+Fabrizio De André|5
+Lucio Dalla|5
+Pino Daniele|5
+Francesco De Gregori|4
+Mina|5
+Renato Zero|4
+Marco Mengoni|4
+Fedez|3
+Sfera Ebbasta|3
+Ultimo|4
+Blanco|3
+Achille Lauro|3
+Subsonica|4
+Litfiba|4
+Negramaro|3
+Ghali|4
+Salmo|4
+Marracash|4
+Giorgia|4`]
+];
+var HUES=[8,48,195,152,330,24,215,98,280,175,62,350];
+var CATS=RAW.map(function(r,i){
+  return {id:r[0],name:r[1],scen:r[2],h:i===0?8:HUES[(i)%HUES.length],
+    items:r[3].split('\n').map(function(l){var p=l.trim().split('|');return {name:p[0],stars:+p[1]};})};
+});
+var BY={};CATS.forEach(function(c){BY[c.id]=c;});
+var SLOTS=5,START=20,SKIPS=2;
+
+var S={screen:'home',names:['Giocatore 1','Giocatore 2'],cat:null,deck:[],i:0,pl:[],turn:0,price:1,hist:[],night:{done:{},wins:[0,0]},res:null};
+try{
+  var sv=JSON.parse(localStorage.getItem('astadraft')||'null');
+  if(sv){S.names=sv.names||S.names;S.night=sv.night||S.night;}
+}catch(e){}
+function save(){try{localStorage.setItem('astadraft',JSON.stringify({names:S.names,night:S.night}));}catch(e){}}
+
+var app=document.getElementById('app');
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function nm(p){return (S.names[p]||'').trim()||('Giocatore '+(p+1));}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function mk(){return {budget:START,picks:[],skips:SKIPS};}
+function full(p){return S.pl[p].picks.length>=SLOTS;}
+function maxP(p){var q=S.pl[p];var left=SLOTS-q.picks.length;if(left<=0)return 0;return Math.max(0,q.budget-(left-1));}
+function maxBoth(){return Math.max(maxP(0),maxP(1));}
+function stars(n){return '★'.repeat(n)+'☆'.repeat(5-n);}
+
+function start(id){
+  var c=BY[id];
+  S.cat=id;S.deck=shuffle(c.items);S.i=0;S.pl=[mk(),mk()];
+  S.turn=Math.random()<.5?0:1;S.price=1;S.hist=[];S.res=null;S.screen='auction';
+  render();window.scrollTo(0,0);
+}
+function snap(){S.hist.push(JSON.stringify({pl:S.pl,i:S.i,turn:S.turn,price:S.price}));}
+function undo(){
+  if(!S.hist.length)return;
+  var o=JSON.parse(S.hist.pop());S.pl=o.pl;S.i=o.i;S.turn=o.turn;S.price=o.price;render();
+}
+function advance(){
+  S.turn=1-S.turn;
+  if(full(S.turn))S.turn=1-S.turn;
+  S.price=Math.max(1,Math.min(S.price,maxBoth()));
+  if((full(0)&&full(1))||S.i>=S.deck.length){finish();return;}
+  render();
+}
+function assign(p){
+  var it=S.deck[S.i];if(!it||full(p)||S.price<1||S.price>maxP(p))return;
+  snap();
+  S.pl[p].picks.push({name:it.name,stars:it.stars,price:S.price});
+  S.pl[p].budget-=S.price;
+  toast(it.name+' a '+nm(p)+' per €'+S.price);
+  S.i++;S.price=1;advance();
+}
+function skip(){
+  var q=S.pl[S.turn];if(q.skips<1||full(S.turn))return;
+  snap();q.skips--;S.i++;S.price=1;toast('Skip di '+nm(S.turn));advance();
+}
+function score(p){
+  var q=S.pl[p];var fame=q.picks.reduce(function(a,b){return a+b.stars;},0);
+  var bonus=Math.floor(q.budget)/2;
+  return {fame:fame,bonus:bonus,total:fame+bonus};
+}
+function finish(){
+  var a=score(0),b=score(1);
+  var win=a.total===b.total?-1:(a.total>b.total?0:1);
+  var all=[];
+  [0,1].forEach(function(p){S.pl[p].picks.forEach(function(k){all.push({p:p,k:k});});});
+  var deal=all.slice().sort(function(x,y){return (y.k.stars/y.k.price)-(x.k.stars/x.k.price)||y.k.stars-x.k.stars;})[0];
+  var flop=all.slice().sort(function(x,y){return (x.k.stars/x.k.price)-(y.k.stars/y.k.price)||y.k.price-x.k.price;})[0];
+  S.res={a:a,b:b,win:win,deal:deal,flop:flop};
+  var prev=S.night.done[S.cat];
+  if(prev&&prev.win>=0)S.night.wins[prev.win]--;
+  S.night.done[S.cat]={win:win};
+  if(win>=0)S.night.wins[win]++;
+  save();S.screen='result';render();window.scrollTo(0,0);
+  confetti(win);
+}
+
+/* views */
+function homeView(){
+  var w=S.night.wins,n=Object.keys(S.night.done).length;
+  var tiles=CATS.map(function(c,i){
+    var d=S.night.done[c.id];
+    var tag=d?(d.win>=0?'<span class="win"><i class="d'+d.win+'"></i>'+esc(nm(d.win))+'</span>':'<span class="win">Pari</span>'):'';
+    return '<button class="tile'+(i===0?' feat':'')+'" data-act="start" data-id="'+c.id+'" style="--h:'+c.h+'">'+
+      '<span><span class="tile-name">'+esc(c.name)+'</span></span>'+
+      '<span class="tile-scen">'+esc(c.scen)+'</span>'+
+      '<span class="tile-meta"><span>'+c.items.length+' voci</span>'+tag+'</span></button>';
+  }).join('');
+  return '<div class="hero"><div class="eyebrow">Draft all\'asta</div><h1>Asta Draft</h1>'+
+    '<p>Scegli uno scenario, battete le voci una alla volta e costruite la squadra migliore.</p></div>'+
+    '<div class="rules"><span class="chip">€20 a testa</span><span class="chip">5 scelte</span><span class="chip">2 skip</span><span class="chip">min. €1 a voce</span></div>'+
+    '<div class="card names"><label><span class="eyebrow"><i class="dot d0"></i>Giocatore 1</span><input id="n0" value="'+esc(S.names[0])+'" maxlength="18" autocomplete="off"></label>'+
+    '<label><span class="eyebrow"><i class="dot d1"></i>Giocatore 2</span><input id="n1" value="'+esc(S.names[1])+'" maxlength="18" autocomplete="off"></label></div>'+
+    '<div class="card night"><div><div class="eyebrow">Classifica della serata</div><div class="progress">'+n+' di '+CATS.length+' scenari giocati</div></div>'+
+    '<div class="score num"><span class="a">'+w[0]+'</span><span>-</span><span class="b">'+w[1]+'</span></div></div>'+
+    '<div class="grid">'+tiles+'</div>';
+}
+function auctionView(){
+  var c=BY[S.cat],it=S.deck[S.i],t=S.turn;
+  var mx=[maxP(0),maxP(1)],mb=maxBoth();
+  var panels=[0,1].map(function(p){
+    var q=S.pl[p];
+    var slots='';for(var k=0;k<SLOTS;k++)slots+='<span class="slot'+(k<q.picks.length?' on':'')+'"></span>';
+    return '<div class="pl'+(t===p?' turn':'')+'" style="--c:var(--p'+(p+1)+')">'+
+      '<div class="pl-name">'+esc(nm(p))+'</div>'+
+      '<div class="pl-bud num">€'+q.budget+'</div>'+
+      '<div class="bar"><i style="width:'+(q.budget/START*100)+'%"></i></div>'+
+      '<div class="slots">'+slots+'</div>'+
+      '<div class="pl-foot"><span>'+q.picks.length+'/'+SLOTS+' scelte</span><span>Skip '+q.skips+'</span></div></div>';
+  }).join('');
+  var chips=[1,2,3,5,8].map(function(v){
+    return '<button data-act="price" data-v="'+v+'" class="'+(S.price===v?'sel':'')+'"'+(v>mb?' disabled':'')+'>€'+v+'</button>';
+  }).join('');
+  var teams=[0,1].map(function(p){
+    var q=S.pl[p],li='';
+    for(var k=0;k<SLOTS;k++){
+      var x=q.picks[k];
+      li+=x?'<li><span>'+esc(x.name)+'</span><span class="num">€'+x.price+'</span></li>':'<li class="empty"><span>Libero</span><span>-</span></li>';
+    }
+    return '<div class="team"><h3><i class="dot d'+p+'"></i>'+esc(nm(p))+'</h3><ol>'+li+'</ol></div>';
+  }).join('');
+  var sk=S.pl[t].skips;
+  return '<div class="topbar"><button class="ghost" data-act="home">Esci</button><h2>'+esc(c.name)+'</h2>'+
+    '<button class="ghost" data-act="undo"'+(S.hist.length?'':' disabled')+'>Annulla</button></div>'+
+    '<div class="players">'+panels+'</div>'+
+    '<div class="block" style="--c:var(--p'+(t+1)+');--on:var(--on-p'+(t+1)+')">'+
+      '<div class="progress">'+esc(c.scen)+' · voce '+(S.i+1)+' di '+S.deck.length+'</div>'+
+      '<div class="banner">Tocca a '+esc(nm(t))+': punta o skippa</div>'+
+      '<div class="item" id="it'+S.i+'">'+esc(it.name)+'</div>'+
+      '<div class="stepper"><button class="step" data-act="minus" aria-label="Meno 1 euro"'+(S.price<=1?' disabled':'')+'>−</button>'+
+        '<div class="price num">€'+S.price+'</div>'+
+        '<button class="step" data-act="plus" aria-label="Più 1 euro"'+(S.price>=mb?' disabled':'')+'>+</button></div>'+
+      '<div class="quick">'+chips+'</div>'+
+      '<div class="assign">'+
+        '<button class="btn b0" data-act="assign" data-p="0"'+((full(0)||S.price>mx[0])?' disabled':'')+'>Assegna a '+esc(nm(0))+'<small>'+(full(0)?'squadra piena':'max €'+mx[0])+'</small></button>'+
+        '<button class="btn b1" data-act="assign" data-p="1"'+((full(1)||S.price>mx[1])?' disabled':'')+'>Assegna a '+esc(nm(1))+'<small>'+(full(1)?'squadra piena':'max €'+mx[1])+'</small></button>'+
+      '</div>'+
+      '<button class="btn skip" data-act="skip"'+(sk<1?' disabled':'')+'>Skip di '+esc(nm(t))+'<small>'+(sk<1?'finiti':sk+' rimasti')+'</small></button>'+
+    '</div>'+
+    '<div class="teams">'+teams+'</div>';
+}
+function resultView(){
+  var c=BY[S.cat],r=S.res;
+  var w=r.win;
+  var head=w<0?'<div class="crown" style="--c:var(--surface2);--on:var(--ink)">Pareggio</div>':
+    '<div class="crown" style="--c:var(--p'+(w+1)+');--on:var(--on-p'+(w+1)+')">Vince '+esc(nm(w))+'</div>';
+  var d=0;
+  var teams=[0,1].map(function(p){
+    var sc=p===0?r.a:r.b;
+    var rows=S.pl[p].picks.map(function(k){
+      var del=(d++*0.22).toFixed(2)+'s';
+      return '<div class="row" style="--d:'+del+'"><b>'+esc(k.name)+'</b><span class="stars">'+stars(k.stars)+'</span><small class="num">pagato €'+k.price+'</small><small></small></div>';
+    }).join('');
+    return '<div class="rteam" style="--c:var(--p'+(p+1)+')"><div class="rteam-head"><h3>'+esc(nm(p))+'</h3><div class="rteam-score num">'+sc.total+'</div></div>'+
+      rows+'<div class="sum num">Voto del banco '+sc.fame+' + risparmio '+sc.bonus+' (€'+S.pl[p].budget+' avanzati, 1 punto ogni €2)</div></div>';
+  }).join('');
+  var badges='';
+  if(r.deal)badges+='<div class="badge"><div class="eyebrow">Affare della serata</div><b>'+esc(r.deal.k.name)+'</b><span>'+esc(nm(r.deal.p))+' lo prende a €'+r.deal.k.price+' ('+r.deal.k.stars+' stelle)</span></div>';
+  if(r.flop&&(!r.deal||r.flop!==r.deal))badges+='<div class="badge"><div class="eyebrow">Spesa azzardata</div><b>'+esc(r.flop.k.name)+'</b><span>'+esc(nm(r.flop.p))+' paga €'+r.flop.k.price+' per '+r.flop.k.stars+' stelle</span></div>';
+  var wn=S.night.wins;
+  return '<div class="verdict"><div class="eyebrow">'+esc(c.name)+'</div><h1>Verdetto</h1>'+head+'</div>'+
+    '<div class="rteams">'+teams+'</div>'+
+    '<div class="badges">'+badges+'</div>'+
+    '<div class="card night"><div class="eyebrow">Classifica della serata</div><div class="score num"><span class="a">'+wn[0]+'</span><span>-</span><span class="b">'+wn[1]+'</span></div></div>'+
+    '<div class="cta"><button class="btn main" data-act="home">Prossimo scenario</button><button class="btn alt" data-act="again">Rigioca questo scenario</button></div>';
+}
+function render(){
+  app.innerHTML=S.screen==='home'?homeView():S.screen==='auction'?auctionView():resultView();
+}
+
+/* extras */
+function toast(msg){
+  var o=document.querySelector('.toast');if(o)o.remove();
+  var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove();},1700);
+}
+function confetti(win){
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var cv=document.getElementById('confetti');if(!cv||!cv.getContext)return;
+  var cs=getComputedStyle(document.documentElement);
+  var cols=[cs.getPropertyValue('--p1'),cs.getPropertyValue('--p2'),cs.getPropertyValue('--accent'),cs.getPropertyValue('--good')];
+  if(win>=0)cols=[cs.getPropertyValue(win===0?'--p1':'--p2'),cs.getPropertyValue('--accent'),cs.getPropertyValue('--good'),cs.getPropertyValue(win===0?'--p1':'--p2')];
+  cv.hidden=false;cv.width=innerWidth;cv.height=innerHeight;
+  var x=cv.getContext('2d'),P=[];
+  for(var i=0;i<110;i++)P.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:5+Math.random()*6,c:cols[i%cols.length].trim()||'#fff',r:Math.random()*6});
+  var f=0;
+  (function tick(){
+    x.clearRect(0,0,cv.width,cv.height);
+    P.forEach(function(p){p.x+=p.vx;p.y+=p.vy;p.r+=.15;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6);x.restore();});
+    if(++f<150)requestAnimationFrame(tick);else{x.clearRect(0,0,cv.width,cv.height);cv.hidden=true;}
+  })();
+}
+
+/* events */
+app.addEventListener('click',function(e){
+  var b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  var a=b.dataset.act;
+  if(a==='start')start(b.dataset.id);
+  else if(a==='home'){S.screen='home';render();window.scrollTo(0,0);}
+  else if(a==='again')start(S.cat);
+  else if(a==='undo')undo();
+  else if(a==='skip')skip();
+  else if(a==='assign')assign(+b.dataset.p);
+  else if(a==='minus'){S.price=Math.max(1,S.price-1);render();}
+  else if(a==='plus'){S.price=Math.min(maxBoth(),S.price+1);render();}
+  else if(a==='price'){S.price=Math.min(+b.dataset.v,maxBoth());render();}
+});
+app.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='n0'||t.id==='n1'){S.names[t.id==='n0'?0:1]=t.value;save();}
+});
+render();
+</script>
+
+</body></html>
