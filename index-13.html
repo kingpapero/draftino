@@ -1,0 +1,1741 @@
+<!doctype html>
+<html lang="it"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Draftino?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: single phone column. Home = featured sushi tile + colour grid of 20 scenarios.
+   Auction = two player panels, the item on the block, price stepper, assign/skip. Result = reveal + winner. */
+:root{
+  --bg:#0F2233; --surface:#18334A; --surface2:#21435F; --ink:#F4F7FA; --muted:#9FB6C8; --line:#2D5273;
+  --accent:#FF5A5F; --on-accent:#1B0A0B;
+  --p1:#4CC9F0; --on-p1:#06202E; --p2:#FFC043; --on-p2:#2B1D00;
+  --good:#3DDC97; --bad:#FF7A7A; --tile-ink:#0B1A26;
+  --font-display:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --font-body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF4F8; --surface:#FFFFFF; --surface2:#E1ECF4; --ink:#10283B; --muted:#51697C; --line:#C5D6E2;
+    --accent:#E63946; --on-accent:#FFFFFF;
+    --p1:#0B86B8; --on-p1:#FFFFFF; --p2:#F2A900; --on-p2:#2B1D00;
+    --good:#119865; --bad:#D63B3B; color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EEF4F8; --surface:#FFFFFF; --surface2:#E1ECF4; --ink:#10283B; --muted:#51697C; --line:#C5D6E2;
+  --accent:#E63946; --on-accent:#FFFFFF;
+  --p1:#0B86B8; --on-p1:#FFFFFF; --p2:#F2A900; --on-p2:#2B1D00;
+  --good:#119865; --bad:#D63B3B; color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.4;padding-inline:16px;padding-block:14px 40px}
+#app{max-width:480px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+/* home */
+.hero h1{font-size:40px;font-weight:800;line-height:1}
+.hero p{margin:8px 0 0;color:var(--muted);max-width:34ch}
+.rules{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--surface2);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:500}
+.card{background:var(--surface);border-radius:18px;padding:14px}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.names label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.names input{width:100%;min-width:0;background:var(--surface2);border:2px solid var(--line);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;font-weight:700}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.d0{background:var(--p1)}.d1{background:var(--p2)}
+.night{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.score{font-family:var(--font-display);font-size:34px;font-weight:800;display:flex;gap:10px;align-items:baseline}
+.score .a{color:var(--p1)}.score .b{color:var(--p2)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;text-align:left;border:0;border-radius:18px;padding:14px;min-height:118px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;
+  background:hsl(var(--h) 85% 62%);color:var(--tile-ink);transition:transform .12s}
+.tile:active{transform:scale(.97)}
+.tile-name{font-family:var(--font-display);font-weight:800;font-size:19px;line-height:1.05;overflow-wrap:anywhere}
+.tile-scen{font-size:12.5px;line-height:1.25;opacity:.85}
+.tile-meta{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:700}
+.tile.feat{grid-column:1/-1;min-height:150px;background:hsl(var(--h) 90% 64%)}
+.tile.feat .tile-name{font-size:30px}
+.tile.feat::after{content:"Si parte da qui";position:absolute;top:12px;right:12px;background:var(--tile-ink);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px}
+.win{display:inline-flex;align-items:center;gap:5px;background:var(--tile-ink);color:#fff;border-radius:999px;padding:3px 9px;font-size:11px}
+.win i{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+/* mystery + combos */
+.tile.mys{grid-column:1/-1;min-height:130px;background:var(--surface2);color:var(--ink);border:2px dashed var(--accent)}
+.tile.mys .tile-name{font-size:28px}
+.shuf{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.shuf-name{font-family:var(--font-display);font-weight:800;font-size:40px;line-height:1.05;max-width:100%;overflow-wrap:anywhere;color:var(--accent)}
+.hint{font-size:12.5px;font-weight:700;color:var(--accent)}
+.combos{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.combo{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface2);border-radius:12px;padding:9px 11px;opacity:0;animation:rev .45s ease-out forwards;animation-delay:var(--d)}
+.combo .cn{display:flex;flex-direction:column;gap:2px;min-width:0}
+.combo b{font-size:13.5px}
+.combo small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.combo .pts{font-family:var(--font-display);font-weight:800;font-size:20px}
+.combo.gold .pts{color:var(--good)}
+.combo.curse .pts{color:var(--bad)}
+.missed{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.missed div{display:flex;flex-direction:column;gap:2px}
+.missed small{color:var(--muted);font-size:12px}
+/* auction */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.topbar h2{font-size:20px;flex:1;min-width:0}
+.ghost{background:transparent;border:2px solid var(--line);border-radius:12px;padding:8px 12px;font-weight:600;font-size:13.5px}
+.ghost:disabled{opacity:.35;cursor:default}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pl{background:var(--surface);border-radius:16px;padding:12px;border-top:5px solid var(--c);display:flex;flex-direction:column;gap:8px;min-width:0;outline:3px solid transparent;transition:outline-color .2s}
+.pl.turn{outline-color:var(--c)}
+.pl-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-bud{font-family:var(--font-display);font-size:34px;font-weight:800;line-height:1}
+.bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--c);transition:width .35s}
+.slots{display:flex;gap:5px}
+.slot{flex:1;height:10px;border-radius:4px;background:var(--surface2)}
+.slot.on{background:var(--c)}
+.pl-foot{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.block{background:var(--surface);border-radius:22px;padding:18px 16px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.banner{border-radius:999px;padding:7px 14px;font-weight:700;font-size:13.5px;align-self:center;background:var(--c);color:var(--on);}
+.item{font-family:var(--font-display);font-weight:800;font-size:34px;line-height:1.05;overflow-wrap:anywhere;animation:pop .35s ease-out;min-height:2.1em;display:flex;align-items:center;justify-content:center}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.stepper{display:flex;align-items:center;justify-content:center;gap:14px}
+.step{width:52px;height:52px;border-radius:50%;border:0;background:var(--surface2);font-size:26px;font-weight:700}
+.step:disabled{opacity:.3}
+.price{font-family:var(--font-display);font-size:48px;font-weight:800;min-width:3.2ch}
+.quick{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.quick button{border:2px solid var(--line);background:transparent;border-radius:999px;padding:6px 14px;font-weight:700}
+.quick button.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.quick button:disabled{opacity:.3}
+.assign{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:16px;padding:14px 10px;font-weight:800;font-size:16px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;min-height:60px}
+.btn small{font-weight:500;font-size:11.5px;opacity:.8}
+.btn:disabled{opacity:.3;cursor:default}
+.b0{background:var(--p1);color:var(--on-p1)}.b1{background:var(--p2);color:var(--on-p2)}
+.btn.skip{background:transparent;border:2px dashed var(--muted);color:var(--ink);flex-direction:row;justify-content:center;gap:8px;width:100%}
+.progress{font-size:12.5px;color:var(--muted)}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.team{background:var(--surface);border-radius:16px;padding:12px;min-width:0}
+.team h3{font-size:15px;margin-bottom:8px;display:flex;align-items:center}
+.team ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.team li{display:flex;justify-content:space-between;gap:6px;font-size:13px;min-width:0}
+.team li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team li.empty{color:var(--muted)}
+
+/* result */
+.verdict{text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.verdict h1{font-size:40px;font-weight:800;line-height:1}
+.crown{font-family:var(--font-display);font-weight:800;border-radius:999px;padding:6px 16px;background:var(--c);color:var(--on)}
+.rteams{display:flex;flex-direction:column;gap:12px}
+.rteam{background:var(--surface);border-radius:18px;padding:14px;border-left:6px solid var(--c)}
+.rteam-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.rteam-head h3{font-size:20px}
+.rteam-score{font-family:var(--font-display);font-size:30px;font-weight:800;color:var(--c)}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line);opacity:0;animation:rev .45s ease-out forwards;animation-delay:var(--d)}
+@keyframes rev{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.row b{font-weight:700;overflow-wrap:anywhere}
+.stars{color:var(--p2);letter-spacing:1px;white-space:nowrap;text-align:right}
+.row small{color:var(--muted)}
+.sum{font-size:12.5px;color:var(--muted);margin-top:6px}
+.badges{display:grid;gap:10px}
+.badge{background:var(--surface2);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.badge b{font-family:var(--font-display);font-size:16px}
+.cta{display:flex;flex-direction:column;gap:10px}
+.btn.main{background:var(--accent);color:var(--on-accent);flex-direction:row;justify-content:center;width:100%}
+.btn.alt{background:var(--surface2);color:var(--ink);flex-direction:row;justify-content:center;width:100%}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;z-index:60;animation:pop .25s ease-out;max-width:90vw;text-align:center}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .row,.combo{opacity:1}
+}
+</style>
+</head><body>
+<div id="app"></div>
+<canvas id="confetti" hidden></canvas>
+<script>
+var RAW=[
+['film','Maratona film','5 film per 5 serate di fila',`Il Padrino|5
+Pulp Fiction|5
+Forrest Gump|4
+Interstellar|5
+Il Signore degli Anelli: La Compagnia dell'Anello|5
+Matrix|5
+Il Gladiatore|4
+Ritorno al futuro|5
+Shrek|4
+Titanic|3
+Inception|5
+Il Re Leone|4
+Fight Club|5
+Jurassic Park|5
+Star Wars: Una nuova speranza|5
+Harry Potter e la pietra filosofale|4
+Pirati dei Caraibi: La maledizione della prima luna|4
+Quasi amici|4
+La vita è bella|5
+Mamma ho perso l'aereo|3
+Scarface|4
+Quei bravi ragazzi|5
+Parasite|4
+Una notte da leoni|3
+Top Gun: Maverick|4`],
+['sport','Settimana sportiva','5 sport, uno per ogni giorno lavorativo',`Padel|4
+Calcetto|4
+Nuoto|3
+Tennis|4
+Basket|4
+Corsa|3
+Boxe|4
+Arrampicata|4
+Pallavolo|3
+Yoga|2
+Spinning|3
+CrossFit|3
+Surf|5
+Sci|5
+Golf|3
+Ping pong|2
+Rugby|4
+Judo|3
+Scherma|3
+Skateboard|3
+Bouldering|4
+Beach volley|4
+Calcio a 11|4
+Karate|3
+Ciclismo su strada|3`],
+['auto','Garage dei sogni','5 auto nel tuo garage',`Ferrari F40|5
+Lamborghini Countach|5
+Porsche 911 Carrera|5
+Fiat 500 d'epoca|3
+Alfa Romeo Giulia GTA|5
+Mini Cooper|3
+Tesla Model S Plaid|4
+Jeep Wrangler|3
+Mercedes Classe G|4
+DeLorean DMC-12|4
+Ford Mustang Fastback del '68|5
+Land Rover Defender|4
+Maserati MC20|5
+Lancia Delta Integrale|5
+Volkswagen Maggiolino|3
+Aston Martin DB5|5
+Fiat Panda 4x4|2
+BMW M3 E30|4
+Toyota Supra|4
+Nissan GT-R|4
+Range Rover|3
+Audi RS6 Avant|4
+Ape Piaggio|2
+Bugatti Chiron|5`],
+['festival','Festival musicale','5 artisti in line-up, di tutti i generi',`Queen|5
+Coldplay|4
+Daft Punk|5
+Red Hot Chili Peppers|5
+Metallica|4
+Beyoncé|5
+Arctic Monkeys|4
+Pink Floyd|5
+Muse|4
+Dua Lipa|4
+Rihanna|4
+Kendrick Lamar|5
+The Weeknd|4
+Imagine Dragons|3
+Oasis|5
+Nirvana|5
+AC/DC|5
+Guns N' Roses|4
+Linkin Park|4
+Bob Marley|5
+Calvin Harris|3
+Billie Eilish|4
+Radiohead|4
+Gorillaz|4
+Måneskin|4`],
+['calcetto','Squadra di calcetto','5 calciatori per la tua squadra',`Maradona|5
+Pelé|5
+Messi|5
+Cristiano Ronaldo|5
+Ronaldinho|5
+Zidane|5
+Totti|4
+Roberto Baggio|5
+Del Piero|4
+Buffon|5
+Maldini|5
+Cruyff|5
+Ronaldo il Fenomeno|5
+Neymar|4
+Mbappé|5
+Haaland|5
+Modrić|4
+Pirlo|5
+Gattuso|3
+Cannavaro|4
+Ibrahimović|5
+Cassano|3
+Iniesta|5
+Van Basten|5
+Henry|5`],
+['sushi','Menù sushi','5 pezzi per la serata con lo chef sushi',`Nigiri salmone|4
+Nigiri tonno|4
+Nigiri gambero|3
+Nigiri anguilla|4
+Nigiri branzino|3
+Nigiri capasanta|4
+Nigiri toro (ventresca di tonno)|5
+Nigiri tamago|2
+Uramaki California|3
+Uramaki Philadelphia|3
+Uramaki Spicy Tuna|4
+Uramaki Dragon|4
+Hosomaki cetriolo|1
+Hosomaki tonno|3
+Hosomaki salmone|3
+Futomaki vegetariano|2
+Temaki salmone e avocado|4
+Gunkan uova di salmone|4
+Gunkan ricci di mare|5
+Sashimi di salmone|4
+Sashimi di tonno|4
+Tartare di tonno|4
+Tempura di gamberi|4
+Hot roll fritto|3
+Gyoza di maiale|3
+Edamame|2`],
+['cena','Cena a 5 portate','Antipasto, primo, secondo, contorno e dolce',`Carbonara|5
+Lasagna|5
+Tiramisù|5
+Parmigiana di melanzane|5
+Bruschetta al pomodoro|3
+Risotto ai funghi|4
+Cotoletta alla milanese|4
+Tagliata di manzo|4
+Patate al forno|3
+Insalata caprese|3
+Panna cotta|4
+Cacio e pepe|5
+Arancini|4
+Tagliatelle al ragù|5
+Polpette al sugo|4
+Fiorentina|5
+Cannoli siciliani|5
+Prosciutto e melone|3
+Insalata mista|1
+Gelato affogato|4
+Gnocchi al gorgonzola|3
+Vitello tonnato|4
+Saltimbocca alla romana|4
+Verdure grigliate|2
+Frittura di paranza|4`],
+['pizza','Giro d\'Italia in pizza','5 pizze per una serata con gli amici',`Margherita|4
+Marinara|3
+Diavola|4
+Quattro formaggi|4
+Capricciosa|3
+Quattro stagioni|3
+Napoli|3
+Prosciutto e funghi|3
+Bufala e pomodorini|4
+Ortolana|2
+Pizza fritta|4
+Calzone|4
+Wurstel e patatine|2
+Crudo e rucola|4
+Pizza alla Nutella|3
+Boscaiola|3
+Salsiccia e friarielli|5
+Tonno e cipolla|3
+Carbonara in pizza|4
+Pizza con l'ananas|1
+Pizza bianca romana|4
+Focaccia di Recco|4
+Pinsa romana|4
+Burrata e mortadella|5`],
+['tour','Tour del mondo','5 città in cui vivere un anno ciascuna',`Tokyo|5
+New York|5
+Parigi|5
+Londra|4
+Barcellona|5
+Sydney|4
+Rio de Janeiro|4
+Dubai|3
+Bangkok|4
+Città del Capo|4
+Los Angeles|4
+Lisbona|5
+Berlino|4
+Amsterdam|4
+Singapore|4
+Ubud, Bali|5
+Istanbul|4
+Marrakech|4
+Buenos Aires|4
+Reykjavik|3
+Vancouver|4
+Seoul|4
+Roma|5
+Miami|4
+Copenaghen|4`],
+['vacanza','Vacanza itinerante','5 tappe in 5 paesi diversi',`Giappone|5
+Islanda|5
+Thailandia|4
+Grecia|5
+Messico|4
+Portogallo|4
+Norvegia|4
+Marocco|4
+Stati Uniti on the road|5
+Australia|4
+Nuova Zelanda|5
+Perù|4
+Vietnam|4
+Croazia|4
+Spagna|4
+Egitto|4
+Maldive|5
+Sudafrica|4
+Canada|4
+Argentina|4
+Turchia|4
+Scozia|4
+Cuba|3
+Kenya, safari|5
+Indonesia|4`],
+['serie','Binge di un mese','5 serie TV da divorare',`Breaking Bad|5
+Game of Thrones|5
+Peaky Blinders|5
+Friends|5
+The Office US|5
+Stranger Things|4
+Black Mirror|4
+La casa di carta|3
+Gomorra|4
+Squid Game|4
+The Crown|3
+Dark|5
+Suits|4
+How I Met Your Mother|4
+Narcos|4
+The Last of Us|5
+Succession|5
+Boris|5
+Lupin|3
+Better Call Saul|5
+The Bear|5
+Chernobyl|5
+Vikings|4
+Sherlock|5
+Rick and Morty|5`],
+['console','Serata console','5 videogiochi per giocare tutti insieme',`Mario Kart|5
+EA Sports FC|4
+Super Smash Bros|5
+Fortnite|3
+Mario Party|4
+Overcooked|4
+Just Dance|3
+Rocket League|4
+Call of Duty|4
+GTA V|5
+Minecraft|4
+Tekken|4
+Street Fighter|4
+Crash Team Racing|4
+Pro Evolution Soccer|4
+It Takes Two|5
+Tetris|3
+Jackbox Party Pack|4
+Wii Sports Tennis|4
+Mortal Kombat|4
+Among Us|3
+Fall Guys|3
+Super Mario Bros. Wonder|4
+Zelda: Breath of the Wild|5`],
+['zoo','Zoo in giardino','5 animali da tenere a casa tua',`Panda|4
+Leone|5
+Elefante|4
+Pinguino|4
+Giraffa|3
+Tigre|5
+Delfino|4
+Lama|3
+Capibara|5
+Koala|4
+Lupo|4
+Aquila reale|4
+Gorilla|4
+Pappagallo ara|3
+Rinoceronte|3
+Orso polare|4
+Volpe fennec|4
+Suricato|4
+Tartaruga gigante|3
+Ippopotamo|3
+Axolotl|3
+Camaleonte|3
+Cavallo|4
+Fenicottero|3
+Squalo bianco in piscina|5`],
+['storia','Cena con la storia','5 personaggi seduti al tuo tavolo',`Leonardo da Vinci|5
+Napoleone|4
+Cleopatra|4
+Giulio Cesare|4
+Albert Einstein|5
+Cristoforo Colombo|3
+Michelangelo|4
+Galileo Galilei|4
+Nikola Tesla|5
+Marco Polo|4
+Mozart|4
+Marie Curie|5
+Dante Alighieri|4
+Nelson Mandela|5
+Winston Churchill|4
+Gandhi|4
+Steve Jobs|4
+Freddie Mercury|5
+Muhammad Ali|5
+Alessandro Magno|5
+Machiavelli|3
+Caravaggio|4
+Frida Kahlo|4
+Elvis Presley|4
+Charlie Chaplin|4`],
+['cocktail','Aperitivo cocktail','5 cocktail per la tua serata',`Spritz|4
+Negroni|5
+Mojito|4
+Margarita|4
+Gin Tonic|4
+Moscow Mule|3
+Daiquiri|3
+Cosmopolitan|3
+Old Fashioned|4
+Piña Colada|3
+Hugo|3
+Americano|3
+Long Island|3
+Caipirinha|3
+Bellini|3
+Espresso Martini|4
+Mai Tai|3
+Whisky Sour|4
+Sex on the Beach|2
+Tequila Sunrise|3
+Manhattan|4
+Bloody Mary|3
+Campari Soda|3
+Rum e Cola|2
+Negroni sbagliato|4`],
+['armadio','Armadio capsula','5 marchi per vestirti tutto l\'anno',`Nike|5
+Adidas|4
+Zara|3
+Levi's|4
+Ralph Lauren|4
+Gucci|4
+Prada|4
+Stone Island|4
+C.P. Company|3
+Moncler|4
+The North Face|4
+Carhartt|4
+Patagonia|4
+Lacoste|3
+Fred Perry|3
+H&M|2
+Uniqlo|3
+Diesel|3
+Armani|4
+Supreme|3
+Off-White|3
+New Balance|4
+Converse|4
+Vans|3
+Dr. Martens|3
+Ray-Ban|4`],
+['gelato','Gelateria','5 gusti per il tuo cono perfetto',`Pistacchio|5
+Cioccolato fondente|4
+Nocciola|5
+Stracciatella|4
+Fior di latte|3
+Limone|3
+Fragola|3
+Cookies|4
+Bacio|4
+Crema|3
+Tiramisù|4
+Caffè|3
+Malaga|3
+Menta|2
+Cocco|3
+Mandorla|3
+Zuppa inglese|3
+Vaniglia|2
+Dulce de leche|4
+Amarena|4
+Mango|3
+Cioccolato bianco|3
+Ricotta e pera|3
+Gianduia|5
+Cheesecake|4`],
+['snack','Pausa pranzo da campioni','5 snack e dolci per una settimana',`Nutella|5
+Kinder Bueno|5
+Oreo|4
+Pringles|4
+Ringo|3
+Baci Perugina|4
+Pocket Coffee|4
+Brioche alla crema|4
+Taralli|3
+Fonzies|3
+TUC|3
+Pan di Stelle|4
+Cornetto Algida|5
+Twix|4
+Snickers|4
+Bounty|2
+Haribo|4
+Maxibon|4
+Girella|3
+Tronky|3
+Mikado|3
+Noccioline|2
+Mela|1
+Barretta proteica|2
+Popcorn|3`],
+['eroi','Squadra di supereroi','5 eroi o villain per la battaglia finale',`Batman|5
+Superman|4
+Spider-Man|5
+Iron Man|5
+Wonder Woman|4
+Wolverine|5
+Hulk|4
+Thor|4
+Capitan America|4
+Black Panther|4
+Joker|5
+Thanos|5
+Deadpool|5
+Flash|3
+Aquaman|2
+Doctor Strange|4
+Magneto|4
+Loki|4
+Darth Vader|5
+Gandalf|5
+Goku|5
+Venom|4
+Daredevil|3
+Catwoman|3
+Ant-Man|2`],
+['cartoni','Pomeriggio cartoni','5 cartoni della tua infanzia',`Dragon Ball|5
+One Piece|5
+Naruto|5
+Pokémon|5
+I Simpson|5
+Holly e Benji|5
+Tom & Jerry|4
+SpongeBob|4
+Looney Tunes|4
+Doraemon|4
+Sailor Moon|4
+Beyblade|3
+Digimon|4
+Yu-Gi-Oh!|4
+Pingu|3
+Gormiti|3
+Winx|3
+I Griffin|4
+South Park|4
+I Cavalieri dello Zodiaco|5
+Lupin III|4
+Mila e Shiro|3
+Tartarughe Ninja|4
+Ben 10|3
+Il laboratorio di Dexter|4
+Scooby-Doo|4`],
+['cantanti','Tour italiano','5 artisti per un tour immaginario',`Vasco Rossi|5
+Ligabue|4
+Laura Pausini|4
+Eros Ramazzotti|4
+Jovanotti|5
+Cesare Cremonini|4
+Max Pezzali|4
+Tiziano Ferro|4
+Zucchero|4
+Elisa|3
+Lucio Battisti|5
+Fabrizio De André|5
+Lucio Dalla|5
+Pino Daniele|5
+Francesco De Gregori|4
+Mina|5
+Renato Zero|4
+Marco Mengoni|4
+Fedez|3
+Sfera Ebbasta|3
+Ultimo|4
+Blanco|3
+Achille Lauro|3
+Subsonica|4
+Litfiba|4
+Negramaro|3
+Ghali|4
+Salmo|4
+Marracash|4
+Giorgia|4`],
+['scacchi','Torneo di scacchi','5 scacchisti per la tua squadra a un torneo',`Magnus Carlsen|5
+Garry Kasparov|5
+Bobby Fischer|5
+Anatoly Karpov|5
+Mikhail Tal|5
+José Raúl Capablanca|5
+Alexander Alekhine|4
+Viswanathan Anand|5
+Hikaru Nakamura|4
+Fabiano Caruana|4
+Judit Polgár|5
+Boris Spassky|4
+Vladimir Kramnik|4
+Paul Morphy|4
+Wilhelm Steinitz|3
+Emanuel Lasker|4
+Mikhail Botvinnik|4
+Tigran Petrosian|4
+Ding Liren|3
+Gukesh Dommaraju|4
+Alireza Firouzja|3
+Anish Giri|3
+Wesley So|3
+Hou Yifan|3
+Praggnanandhaa|3
+Levy Rozman|3`],
+['palestra','Scheda in palestra','5 esercizi per l\'allenamento perfetto',`Squat|5
+Panca piana|5
+Stacco da terra|5
+Military press|4
+Trazioni alla sbarra|5
+Rematore con bilanciere|4
+Dip alle parallele|4
+Affondi|3
+Leg press|3
+Hip thrust|4
+Curl con manubri|3
+French press|3
+Lat machine|3
+Pulley|2
+Alzate laterali|3
+Face pull|3
+Plank|3
+Spinning|3
+Corda per saltare|3
+Burpees|3
+Kettlebell swing|4
+Croci ai cavi|2
+Leg curl|2
+Calf raise|2
+Crunch ai cavi|2
+Farmer's walk|4`],
+['serieA','Dream team Serie A','5 attaccanti da fantacalcio per vincere il campionato',`Gabriel Batistuta|5
+Roberto Baggio|5
+Alessandro Del Piero|5
+Francesco Totti|5
+Christian Vieri|4
+Andriy Shevchenko|5
+David Trezeguet|4
+Filippo Inzaghi|4
+Hernán Crespo|4
+Antonio Di Natale|4
+Edinson Cavani|4
+Gonzalo Higuaín|5
+Diego Milito|4
+Zlatan Ibrahimović|5
+Ciro Immobile|4
+Romelu Lukaku|4
+Paulo Dybala|4
+Victor Osimhen|4
+Lautaro Martínez|4
+Giuseppe Signori|4
+Marco van Basten|5
+Ronaldo il Fenomeno|5
+Luca Toni|4
+Vincenzo Montella|3
+Gianluca Vialli|4
+Roberto Mancini|3`],
+['panchina','Panchina da sogno','5 allenatori per il tuo staff tecnico',`Arrigo Sacchi|5
+Fabio Capello|5
+Carlo Ancelotti|5
+Marcello Lippi|5
+Giovanni Trapattoni|5
+José Mourinho|5
+Antonio Conte|4
+Massimiliano Allegri|4
+Roberto Mancini|4
+Luciano Spalletti|4
+Maurizio Sarri|4
+Claudio Ranieri|4
+Zdeněk Zeman|4
+Gian Piero Gasperini|4
+Simone Inzaghi|4
+Stefano Pioli|3
+Walter Mazzarri|3
+Enzo Bearzot|4
+Pep Guardiola|5
+Alex Ferguson|5
+Jürgen Klopp|5
+Johan Cruijff|5
+Vujadin Boškov|3
+Nils Liedholm|4
+Nereo Rocco|3`],
+['parigi','Weekend a Parigi','5 tappe in 48 ore',`Torre Eiffel|5
+Museo del Louvre|5
+Montmartre e Sacré-Cœur|5
+Cattedrale di Notre-Dame|5
+Arco di Trionfo|4
+Champs-Élysées|3
+Musée d'Orsay|5
+Giardini del Lussemburgo|4
+Reggia di Versailles|5
+Quartiere Latino|4
+Le Marais|4
+Canal Saint-Martin|4
+Cimitero Père-Lachaise|3
+Sainte-Chapelle|4
+Centre Pompidou|3
+Crociera sulla Senna|4
+Disneyland Paris|3
+Moulin Rouge e Pigalle|3
+Palais Garnier|4
+Panthéon|3
+Galeries Lafayette|2
+Parc des Buttes-Chaumont|3
+Parc des Princes|3
+Île de la Cité|3
+Orangerie e le Ninfee di Monet|4`],
+['francese','Cena alla francese','5 portate di una serata a Parigi',`Soupe à l'oignon|4
+Escargots|3
+Foie gras|4
+Quiche lorraine|3
+Salade niçoise|3
+Croque-monsieur|3
+Moules-frites|4
+Boeuf bourguignon|5
+Coq au vin|4
+Ratatouille|3
+Magret de canard|4
+Cassoulet|4
+Raclette|4
+Tartare di manzo|4
+Entrecôte con patatine|5
+Crème brûlée|5
+Tarte Tatin|4
+Crêpes Suzette|4
+Mille-feuille|4
+Macaron|4
+Éclair al cioccolato|4
+Profiteroles|4
+Plateau di formaggi|5
+Camembert al forno|4
+Baguette e burro salato|3`],
+['cloud','Infrastruttura cloud','5 servizi AWS per costruire la tua app',`Amazon S3|5
+Amazon EC2|5
+AWS Lambda|5
+Amazon RDS|4
+Amazon DynamoDB|4
+Amazon CloudFront|3
+Amazon VPC|4
+AWS IAM|5
+Amazon CloudWatch|3
+Amazon SQS|3
+Amazon SNS|3
+Amazon EBS|3
+Amazon Route 53|4
+Amazon ECS|3
+Amazon EKS|3
+AWS CloudFormation|3
+Amazon Aurora|4
+Amazon Redshift|3
+Elastic Beanstalk|2
+Amazon API Gateway|4
+Amazon Glacier|2
+Amazon Cognito|3
+Amazon Kinesis|2
+AWS Fargate|3
+Amazon Bedrock|4`],
+['ai','Cassetta degli attrezzi AI','5 strumenti di intelligenza artificiale per lavorare meglio',`ChatGPT|5
+Claude|5
+Gemini|4
+Midjourney|4
+Perplexity|4
+GitHub Copilot|4
+Cursor|4
+NotebookLM|4
+Sora|3
+ElevenLabs|4
+DeepSeek|3
+Grok|2
+Llama|3
+Stable Diffusion|3
+Runway|3
+Suno|3
+Notion AI|3
+Canva Magic Studio|3
+Zapier|3
+n8n|3
+Hugging Face|4
+Lovable|3
+v0|3
+Whisper|3
+Microsoft Copilot|3`],
+['libri','Biblioteca personale','5 libri per un anno su un\'isola deserta',`Il nome della rosa|5
+1984|5
+Il piccolo principe|4
+Il Signore degli Anelli|5
+Il Gattopardo|4
+Cent'anni di solitudine|5
+Il vecchio e il mare|4
+Sapiens|4
+Il Conte di Montecristo|5
+La Divina Commedia|5
+I promessi sposi|3
+Pensare, veloce e lento|4
+Il maestro e Margherita|4
+Il giovane Holden|3
+Dune|5
+Fondazione|4
+L'arte della guerra|4
+Il Principe|4
+Siddharta|3
+Moby Dick|3
+Orgoglio e pregiudizio|4
+Fahrenheit 451|4
+Il buio oltre la siepe|4
+Se questo è un uomo|5
+Il codice da Vinci|2
+Il pendolo di Foucault|3`],
+['cda','Consiglio d\'amministrazione','5 imprenditori per la tua azienda',`Steve Jobs|5
+Elon Musk|4
+Bill Gates|5
+Warren Buffett|5
+Jeff Bezos|4
+Leonardo Del Vecchio|4
+Enzo Ferrari|5
+Giorgio Armani|4
+Oprah Winfrey|4
+Richard Branson|4
+Henry Ford|4
+Walt Disney|5
+Ferruccio Lamborghini|4
+Sam Altman|3
+Jensen Huang|4
+Mark Zuckerberg|3
+Larry Page|3
+Adriano Olivetti|4
+Coco Chanel|4
+Michele Ferrero|4
+Sara Blakely|3
+Ingvar Kamprad|3
+Reid Hoffman|3
+Brunello Cucinelli|3
+Sergio Marchionne|4`],
+['italia','Weekend in Italia','5 città italiane da vivere ognuna per un weekend',`Roma|5
+Firenze|5
+Venezia|5
+Napoli|5
+Milano|4
+Torino|4
+Bologna|5
+Palermo|4
+Verona|4
+Genova|3
+Matera|4
+Lecce|4
+Siena|4
+Cagliari|3
+Trieste|4
+Bari|3
+Bergamo|3
+Pisa|3
+Perugia|3
+Ravenna|3
+Lago di Como|5
+Cinque Terre|5
+Capri|4
+Sorrento e Costiera Amalfitana|5
+Cortina d'Ampezzo|4`],
+['tapas','Tapas bar','5 piatti per una serata spagnola',`Patatas bravas|4
+Tortilla de patatas|5
+Jamón ibérico|5
+Croquetas|4
+Gambas al ajillo|4
+Pulpo a la gallega|4
+Pimientos de Padrón|3
+Pan con tomate|3
+Gazpacho|3
+Paella|5
+Calamares fritos|4
+Chorizo al vino|3
+Queso manchego|3
+Albóndigas|3
+Boquerones en vinagre|3
+Ensaladilla rusa|3
+Churros con cioccolata|5
+Pintxo de gilda|3
+Salmorejo|3
+Fabada asturiana|3
+Empanadas gallegas|3
+Queso con membrillo|3
+Pisto manchego|2
+Sangria|3
+Crema catalana|4`],
+['playlist','Playlist da allenamento','5 canzoni per la tua ora in palestra',`Eye of the Tiger|5
+Lose Yourself|5
+Stronger|4
+Till I Collapse|5
+Can't Hold Us|4
+Thunderstruck|5
+Don't Stop Me Now|5
+Run the World (Girls)|3
+Remember the Name|4
+Welcome to the Jungle|4
+Seven Nation Army|5
+Sicko Mode|4
+Power|4
+Believer|3
+Harder, Better, Faster, Stronger|4
+Born to Run|3
+The Final Countdown|4
+Blinding Lights|4
+Radioactive|3
+Jump Around|4
+Pump It|3
+Titanium|3
+Enter Sandman|4
+Dragostea din tei|1
+Gonna Fly Now|4
+Born Slippy|3`],
+['stadi','Stadi del mondo','5 stadi da visitare almeno una volta',`San Siro|5
+Camp Nou|5
+Wembley|5
+Maracanã|5
+Santiago Bernabéu|5
+Old Trafford|5
+Anfield|5
+Allianz Arena|4
+Signal Iduna Park|5
+Stadio Olimpico di Roma|4
+La Bombonera|5
+Stadio Diego Armando Maradona|5
+Allianz Stadium|3
+Parc des Princes|3
+Emirates Stadium|3
+Etihad Stadium|3
+Johan Cruijff ArenA|3
+Estadio Azteca|5
+Stamford Bridge|3
+Tottenham Hotspur Stadium|3
+Estadio Monumental|4
+Estádio da Luz|3
+Mestalla|3
+San Mamés|3
+Stade de France|3
+Celtic Park|4
+Stadio Artemio Franchi|3
+Stadio Renato Dall'Ara|3`],
+['club','Superlega personale','5 club di cui diventare presidente',`Juventus|5
+Inter|5
+Milan|5
+Napoli|4
+Roma|4
+Lazio|3
+Fiorentina|3
+Atalanta|3
+Torino|3
+Bologna|3
+Real Madrid|5
+Barcellona|5
+Paris Saint-Germain|4
+Bayern Monaco|5
+Liverpool|5
+Manchester City|4
+Arsenal|4
+Manchester United|5
+Borussia Dortmund|4
+Ajax|4
+Benfica|3
+Atlético Madrid|4
+Chelsea|4
+Olympique Marsiglia|3
+Tottenham|3
+Boca Juniors|4
+Flamengo|3
+Celtic|3
+Porto|3`],
+['cantina','Cantina di casa','5 vini per la tua cena perfetta',`Barolo|5
+Chianti Classico|4
+Prosecco|3
+Champagne|5
+Amarone della Valpolicella|5
+Brunello di Montalcino|5
+Franciacorta|4
+Vermentino|3
+Primitivo di Manduria|3
+Montepulciano d'Abruzzo|3
+Lambrusco|2
+Bordeaux rosso|5
+Borgogna Pinot Noir|5
+Sassicaia|5
+Barbaresco|4
+Nero d'Avola|3
+Chardonnay|3
+Sauvignon Blanc|3
+Rioja|4
+Cava|2
+Pinot Grigio|2
+Soave|2
+Gavi|3
+Etna Rosso|4
+Sauternes|3
+Lacryma Christi|2`],
+['tech','Scrivania da smanettone','5 gadget per la tua postazione',`MacBook Pro|5
+iPhone|5
+iPad|4
+AirPods Pro|4
+Apple Watch|3
+Kindle|4
+Steam Deck|4
+Nintendo Switch|4
+PlayStation 5|5
+Raspberry Pi|4
+Tastiera meccanica|3
+Monitor ultrawide|4
+GoPro|3
+Drone DJI|4
+Samsung Galaxy Fold|3
+Meta Ray-Ban|2
+Sonos Beam|3
+Cuffie Sony WH-1000XM|4
+Logitech MX Master|4
+Scrivania regolabile|3
+Stampante 3D|3
+Fujifilm X100|4
+Mac mini|4
+Google Pixel|3
+Microfono Shure|3
+Router Wi-Fi 7|2`],
+['eventi','Evento sportivo dal vivo','5 eventi da vedere una volta nella vita',`Finale di Champions League|5
+Mondiali di calcio|5
+Olimpiadi|5
+Wimbledon|5
+Gran Premio di Monaco|5
+Tour de France|4
+Super Bowl|5
+Roland Garros|4
+Finale NBA|4
+Giro d'Italia|4
+MotoGP al Mugello|5
+Six Nations|4
+US Open di tennis|4
+Gran Premio di Monza|5
+Americas Cup|3
+Australian Open|4
+The Masters di golf|3
+Ryder Cup|3
+Maratona di New York|4
+Dakar|4
+Clásico Real-Barça|5
+Derby della Madonnina|5
+Palio di Siena|4
+Mondiale di scacchi|4
+Finale di Coppa Italia|2`],
+['f1','Griglia di Formula 1','5 piloti per il tuo team',`Ayrton Senna|5
+Michael Schumacher|5
+Lewis Hamilton|5
+Max Verstappen|5
+Niki Lauda|5
+Alain Prost|5
+Sebastian Vettel|4
+Fernando Alonso|5
+Kimi Räikkönen|4
+Juan Manuel Fangio|5
+Jim Clark|4
+Mika Häkkinen|4
+Gilles Villeneuve|5
+Charles Leclerc|4
+Lando Norris|4
+Carlos Sainz|3
+George Russell|3
+Daniel Ricciardo|3
+Jenson Button|3
+Nigel Mansell|4
+James Hunt|4
+Jackie Stewart|4
+Nico Rosberg|3
+Oscar Piastri|3
+Michele Alboreto|3`],
+['tennis','Torneo di tennis','5 tennisti per il tuo team di Coppa Davis',`Roger Federer|5
+Rafael Nadal|5
+Novak Djokovic|5
+Jannik Sinner|5
+Carlos Alcaraz|5
+Andre Agassi|5
+Pete Sampras|5
+Björn Borg|5
+John McEnroe|5
+Serena Williams|5
+Lorenzo Musetti|3
+Matteo Berrettini|3
+Adriano Panatta|4
+Nicola Pietrangeli|4
+Boris Becker|4
+Andy Murray|4
+Stan Wawrinka|3
+Daniil Medvedev|3
+Alexander Zverev|3
+Ash Barty|3
+Martina Navratilova|4
+Steffi Graf|5
+Chris Evert|4
+Maria Sharapova|3
+Flavia Pennetta|3`],
+['animazione','Serata d\'animazione','5 film d\'animazione da guardare insieme',`Toy Story|5
+Alla ricerca di Nemo|5
+Gli Incredibili|4
+Ratatouille|5
+WALL·E|5
+Up|5
+Inside Out|5
+Coco|4
+Frozen|4
+Aladdin|4
+La Bella e la Bestia|4
+Cars|3
+Monsters & Co.|4
+Kung Fu Panda|4
+Madagascar|3
+L'era glaciale|4
+Il castello errante di Howl|5
+La città incantata|5
+Il mio vicino Totoro|5
+Spider-Man: Un nuovo universo|5
+Oceania|3
+Zootropolis|4
+Rapunzel|3
+Lilo & Stitch|4
+Cattivissimo me|4
+Il Re Leone|5`],
+['tavolo','Serata giochi da tavolo','5 giochi per una notte tra amici',`Catan|5
+Risiko|4
+Monopoli|4
+Dixit|4
+Carcassonne|4
+Ticket to Ride|5
+Pandemic|4
+Cluedo|3
+Scacchi|5
+Dama|2
+Uno|3
+Jenga|3
+Taboo|3
+Codenames|4
+Scrabble|3
+Trivial Pursuit|3
+Cards Against Humanity|3
+Azul|4
+7 Wonders|4
+Splendor|3
+Lupus in tabula|4
+Poker|4
+Scopa|3
+Briscola|3
+Tressette|3
+Backgammon|3`],
+['case','Case vacanza','5 case in cui passare le ferie dell\'anno',`Baita in montagna|4
+Villa sul lago di Como|5
+Attico a Parigi|5
+Trullo in Puglia|4
+Barca a vela|4
+Riad a Marrakech|4
+Loft a New York|5
+Casa sull'albero|3
+Castello in Scozia|4
+Ryokan in Giappone|5
+Villa in Toscana|5
+Faro sulla scogliera|3
+Bungalow alle Maldive|5
+Isola privata|5
+Dammuso a Pantelleria|4
+Chalet a Cortina|4
+Casa galleggiante ad Amsterdam|3
+Hacienda in Messico|3
+Cabin in Canada|4
+Appartamento a Lisbona|4
+Mulino ristrutturato|3
+Camper vintage|3
+Palazzo a Venezia|5
+Finca a Ibiza|4
+Igloo in Lapponia|3`],
+['band','La tua band','5 strumenti per il tuo gruppo',`Chitarra elettrica|5
+Basso|4
+Batteria|5
+Pianoforte|5
+Voce solista|5
+Violino|4
+Sassofono|4
+Tromba|3
+Console da DJ|4
+Chitarra acustica|4
+Sintetizzatore|4
+Armonica|2
+Ukulele|2
+Flauto traverso|3
+Violoncello|3
+Fisarmonica|2
+Contrabbasso|3
+Bongo|2
+Theremin|2
+Cornamusa|1
+Arpa|3
+Organo Hammond|3
+Trombone|2
+Clarinetto|2
+Kazoo|1`],
+['mestieri','Anno sabbatico','5 mestieri da provare per un anno ciascuno',`Sommelier|4
+Pilota di aerei|5
+Chef stellato|5
+Allenatore di Serie A|5
+Astronauta|5
+Scrittore|4
+Fotografo di viaggio|5
+Guida alpina|4
+Barista a Parigi|3
+Streamer|3
+Commentatore sportivo|4
+DJ|4
+Maestro di scacchi|4
+Personal trainer|3
+Skipper|4
+Archeologo|4
+Regista|5
+Surfista professionista|5
+Apicoltore|2
+Ricercatore di intelligenza artificiale|4
+Detective privato|3
+Pasticcere|3
+Vignaiolo|4
+Stuntman|4
+Veterinario|3`],
+['poteri','Superpoteri','5 poteri per la tua giornata ideale',`Volare|5
+Invisibilità|4
+Teletrasporto|5
+Leggere nel pensiero|4
+Super forza|3
+Fermare il tempo|5
+Parlare con gli animali|3
+Super velocità|4
+Viaggiare nel tempo|5
+Guarigione rapida|4
+Respirare sott'acqua|3
+Telecinesi|4
+Parlare ogni lingua|4
+Cambiare forma|4
+Prevedere il futuro|5
+Elasticità|2
+Controllare il fuoco|3
+Controllare il meteo|4
+Memoria perfetta|4
+Attraversare i muri|4
+Clonarsi|4
+Fortuna infinita|5
+Occhi laser|3
+Vista a raggi X|3
+Duplicare oggetti|5`],
+['street','Street food del mondo','5 assaggi per un tour gastronomico',`Kebab|3
+Tacos al pastor|5
+Pad thai|4
+Bánh mì|4
+Falafel|3
+Arepas|3
+Hot dog di New York|3
+Crêpe alla Nutella|4
+Ramen|5
+Takoyaki|3
+Empanadas|4
+Fish and chips|3
+Pretzel bavarese|3
+Arancino|4
+Panino con la milza|3
+Lampredotto|4
+Poutine|3
+Burrito|3
+Currywurst|3
+Gyros|3
+Dim sum|4
+Churros|4
+Waffle belga|4
+Hamburger|4
+Pizza al taglio|5
+Pani puri|3`],
+['isole','Isole da esplorare','5 isole in 5 estati',`Sardegna|5
+Sicilia|5
+Santorini|5
+Mykonos|4
+Maldive|5
+Bali|5
+Ibiza|4
+Formentera|4
+Mauritius|4
+Zanzibar|4
+Hawaii|5
+Capri|4
+Madeira|4
+Tenerife|3
+Maiorca|4
+Creta|4
+Corsica|4
+Malta|3
+Cuba|4
+Giamaica|3
+Seychelles|5
+Isola di Pasqua|4
+Phuket|3
+Procida|3
+Lampedusa|3
+Elba|3`],
+['hobby','Weekend libero','5 hobby per riempire il tempo libero',`Scacchi|5
+Palestra|4
+Cucinare|4
+Fotografia|4
+Giardinaggio|2
+Trekking|4
+Pesca|2
+Leggere|4
+Disegno|3
+Yoga|3
+Nuoto|3
+Campeggio|3
+Birdwatching|2
+Meditazione|3
+Bricolage|2
+Ceramica|3
+Videogiochi|4
+Programmare|4
+Cinema|4
+Ballo|3
+Suonare la chitarra|4
+Orto urbano|2
+Vela|4
+Escape room|3
+Fantacalcio|5`]
+];
+var HUES=[8,48,195,152,330,24,215,98,280,175,62,350];
+var CATS=RAW.map(function(r,i){
+  return {id:r[0],name:r[1],scen:r[2],h:(i*47+8)%360,
+    items:r[3].split('\n').map(function(l){var p=l.trim().split('|');return {name:p[0],stars:+p[1]};})};
+});
+var BY={};CATS.forEach(function(c){BY[c.id]=c;});
+var COMBOS={
+sushi:[["Il trittico del maestro",5,["Nigiri salmone","Nigiri tonno","Nigiri gambero"]],["Sashimi time",4,["Sashimi di salmone","Sashimi di tonno"]],["Antipasto giapponese",4,["Tempura di gamberi","Gyoza di maiale","Edamame"]],["Fusion roll",3,["Uramaki California","Uramaki Philadelphia"]]],
+film:[["Trilogia criminale",6,["Il Padrino","Quei bravi ragazzi","Scarface"]],["Mente aperta",5,["Inception","Interstellar","Matrix"]],["Mondi epici",5,["Il Signore degli Anelli: La Compagnia dell'Anello","Star Wars: Una nuova speranza","Harry Potter e la pietra filosofale"]],["Cult anni 90",4,["Pulp Fiction","Fight Club","Forrest Gump"]],["Famiglia sul divano",4,["Shrek","Il Re Leone","Mamma ho perso l'aereo"]],["Lacrime e sorrisi",3,["Quasi amici","La vita è bella"]]],
+sport:[["Triathlon",6,["Nuoto","Corsa","Ciclismo su strada"]],["Racchette",4,["Padel","Tennis","Ping pong"]],["Arti marziali",4,["Boxe","Judo","Karate"]],["Tutto verticale",3,["Arrampicata","Bouldering"]],["Palla e sabbia",3,["Pallavolo","Beach volley"]],["Sulla tavola",4,["Surf","Skateboard","Sci"]]],
+auto:[["Made in Italy",6,["Ferrari F40","Lamborghini Countach","Maserati MC20"]],["Corsa italiana",4,["Alfa Romeo Giulia GTA","Lancia Delta Integrale"]],["Fuoristrada",5,["Jeep Wrangler","Land Rover Defender","Mercedes Classe G"]],["Sul grande schermo",5,["DeLorean DMC-12","Aston Martin DB5","Ford Mustang Fastback del '68"]],["Utilitarie del cuore",4,["Fiat 500 d'epoca","Fiat Panda 4x4","Ape Piaggio"]],["Garage giapponese",4,["Toyota Supra","Nissan GT-R"]],["Tedesche cattive",5,["BMW M3 E30","Audi RS6 Avant","Porsche 911 Carrera"]]],
+festival:[["Rock leggenda",6,["Queen","Pink Floyd","AC/DC"]],["Pop queens",5,["Beyoncé","Dua Lipa","Rihanna"]],["Brit pack",5,["Oasis","Arctic Monkeys","Coldplay"]],["Elettronica",3,["Daft Punk","Calvin Harris"]],["Hard & heavy",5,["Metallica","Guns N' Roses","AC/DC"]]],
+calcetto:[["Muro azzurro",6,["Buffon","Cannavaro","Maldini"]],["Fantasisti",5,["Totti","Del Piero","Roberto Baggio"]],["Regia",5,["Pirlo","Iniesta","Zidane"]],["I numeri 10",6,["Maradona","Pelé","Messi"]],["Brasile",5,["Ronaldinho","Neymar","Ronaldo il Fenomeno"]],["Attacco moderno",3,["Mbappé","Haaland"]],["Bad boys",3,["Cassano","Ibrahimović"]]],
+cena:[["Pranzo della domenica",5,["Lasagna","Patate al forno","Tiramisù"]],["Menù milanese",4,["Risotto ai funghi","Cotoletta alla milanese"]],["Sicilia in tavola",3,["Arancini","Cannoli siciliani"]],["Bistecca perfetta",5,["Fiorentina","Patate al forno","Verdure grigliate"]],["Antipasto leggero",3,["Insalata caprese","Prosciutto e melone"]]],
+pizza:[["Margherita perfetta",4,["Margherita","Bufala e pomodorini"]],["Trittico napoletano",6,["Margherita","Marinara","Napoli"]],["Dolce e salato",4,["Pizza fritta","Calzone","Pizza alla Nutella"]],["Gourmet",5,["Burrata e mortadella","Crudo e rucola","Salsiccia e friarielli"]],["Roma in teglia",3,["Pizza bianca romana","Pinsa romana"]],["Sacrilegio a Napoli",-4,["Pizza con l'ananas","Margherita"]]],
+tour:[["Europa del sud",5,["Barcellona","Lisbona","Roma"]],["Emisfero sud",5,["Sydney","Rio de Janeiro","Città del Capo"]],["Asia che corre",4,["Tokyo","Seoul","Singapore"]],["Capitali del nord",4,["Londra","Berlino","Copenaghen"]],["Costa ovest",3,["Los Angeles","Vancouver"]]],
+vacanza:[["Il grande nord",5,["Islanda","Norvegia","Scozia"]],["Mediterraneo",5,["Grecia","Croazia","Spagna"]],["Oceania",4,["Australia","Nuova Zelanda"]],["Africa",5,["Kenya, safari","Sudafrica","Marocco"]],["Sudamerica",4,["Perù","Argentina"]],["Sud-est asiatico",4,["Thailandia","Vietnam","Indonesia"]]],
+serie:[["Crime da manuale",5,["Breaking Bad","Better Call Saul"]],["Sitcom d'oro",5,["Friends","The Office US","How I Met Your Mother"]],["Sangue e onore",4,["Game of Thrones","Vikings","Peaky Blinders"]],["Mente contorta",5,["Black Mirror","Dark","Stranger Things"]],["Italia cruda",3,["Gomorra","Boris"]]],
+console:[["Party perfetto",6,["Mario Kart","Super Smash Bros","Mario Party"]],["Cooperativa",5,["Overcooked","It Takes Two","Among Us"]],["Picchiaduro",5,["Tekken","Street Fighter","Mortal Kombat"]],["Calcio da divano",4,["EA Sports FC","Pro Evolution Soccer","Wii Sports Tennis"]]],
+zoo:[["Big five",5,["Leone","Elefante","Rinoceronte"]],["Polo nord e sud",3,["Pinguino","Orso polare"]],["Voliere",4,["Aquila reale","Pappagallo ara","Fenicottero"]],["Cuccioli teneri",4,["Panda","Koala","Suricato"]],["Predatori",4,["Tigre","Lupo","Squalo bianco in piscina"]]],
+storia:[["Menti geniali",6,["Leonardo da Vinci","Albert Einstein","Nikola Tesla"]],["Italia eterna",5,["Dante Alighieri","Michelangelo","Galileo Galilei"]],["Imperatori",6,["Giulio Cesare","Alessandro Magno","Napoleone"]],["Esploratori",3,["Cristoforo Colombo","Marco Polo"]],["Leader di pace",4,["Nelson Mandela","Gandhi"]],["Icone del palco",4,["Freddie Mercury","Elvis Presley","Charlie Chaplin"]]],
+cocktail:[["Aperitivo italiano",5,["Spritz","Negroni","Americano"]],["Tropicale",5,["Mojito","Piña Colada","Mai Tai"]],["Classici d'autore",5,["Old Fashioned","Manhattan","Whisky Sour"]],["Mattina dopo",-4,["Long Island","Tequila Sunrise","Rum e Cola"]]],
+armadio:[["Streetwear",5,["Nike","Adidas","Supreme"]],["Outdoor",5,["The North Face","Patagonia","Carhartt"]],["Lusso italiano",5,["Gucci","Prada","Armani"]],["Sneaker lover",4,["Converse","Vans","New Balance"]],["Casual italiano",4,["Stone Island","C.P. Company"]],["Preppy",4,["Ralph Lauren","Lacoste","Fred Perry"]]],
+gelato:[["Il cono perfetto",5,["Pistacchio","Nocciola","Cioccolato fondente"]],["Sapore di Torino",4,["Gianduia","Bacio","Nocciola"]],["Frutta fresca",4,["Limone","Fragola","Mango"]],["Dolci al cucchiaio",4,["Tiramisù","Zuppa inglese","Cheesecake"]]],
+snack:[["Re del cioccolato",4,["Nutella","Kinder Bueno","Twix"]],["Salato da divano",4,["Pringles","TUC","Fonzies"]],["Biscotti",4,["Oreo","Pan di Stelle","Ringo"]],["Gelato da bar",3,["Cornetto Algida","Maxibon"]],["Settimana in forma",3,["Mela","Barretta proteica","Noccioline"]]],
+eroi:[["Justice League",6,["Batman","Superman","Wonder Woman"]],["Avengers",6,["Iron Man","Thor","Capitan America"]],["Lato oscuro",5,["Joker","Thanos","Darth Vader"]],["Anti-eroi",4,["Deadpool","Venom","Wolverine"]],["Magia",3,["Doctor Strange","Gandalf"]],["Amico di quartiere",3,["Spider-Man","Daredevil"]]],
+cartoni:[["Shonen",6,["Dragon Ball","One Piece","Naruto"]],["Sport a cartoni",4,["Holly e Benji","Mila e Shiro","Beyblade"]],["Satira",5,["I Simpson","I Griffin","South Park"]],["Classici",4,["Tom & Jerry","Looney Tunes","Scooby-Doo"]],["Mostri da collezione",5,["Pokémon","Digimon","Yu-Gi-Oh!"]],["Guerrieri",4,["I Cavalieri dello Zodiaco","Sailor Moon","Winx"]]],
+cantanti:[["Rock italiano",5,["Vasco Rossi","Ligabue","Litfiba"]],["Cantautori",6,["Fabrizio De André","Lucio Dalla","Francesco De Gregori"]],["Rap",4,["Salmo","Marracash","Fedez"]],["Pop anni 2000",5,["Laura Pausini","Tiziano Ferro","Eros Ramazzotti"]],["Voci femminili",4,["Mina","Giorgia","Elisa"]]],
+scacchi:[["Duello del secolo",5,["Bobby Fischer","Boris Spassky"]],["Era sovietica",5,["Mikhail Botvinnik","Tigran Petrosian","Mikhail Tal"]],["Guerra fredda",5,["Garry Kasparov","Anatoly Karpov"]],["I più forti di sempre",6,["Magnus Carlsen","Garry Kasparov","Bobby Fischer"]],["Giovani prodigi",5,["Gukesh Dommaraju","Praggnanandhaa","Alireza Firouzja"]],["Regine",4,["Judit Polgár","Hou Yifan"]],["Re del web",3,["Hikaru Nakamura","Levy Rozman"]]],
+palestra:[["I tre grandi",7,["Squat","Panca piana","Stacco da terra"]],["Giorno push",5,["Panca piana","Military press","Dip alle parallele"]],["Giorno pull",5,["Trazioni alla sbarra","Rematore con bilanciere","Lat machine"]],["Gambe e glutei",4,["Squat","Hip thrust","Affondi"]],["Cardio",4,["Spinning","Corda per saltare","Burpees"]],["Braccia grosse",3,["Curl con manubri","French press"]]],
+serieA:[["Coppia Sampdoria",5,["Gianluca Vialli","Roberto Mancini"]],["Coppia Juve",5,["Alessandro Del Piero","David Trezeguet"]],["Napoli che ruggisce",5,["Gonzalo Higuaín","Edinson Cavani","Victor Osimhen"]],["Bomber anni 90",5,["Gabriel Batistuta","Christian Vieri","Hernán Crespo"]],["Coppia Inter",5,["Romelu Lukaku","Lautaro Martínez"]],["Capitani",4,["Francesco Totti","Alessandro Del Piero"]]],
+panchina:[["Mondiali ed Europei azzurri",6,["Enzo Bearzot","Marcello Lippi","Roberto Mancini"]],["Milan degli Immortali",5,["Arrigo Sacchi","Fabio Capello","Carlo Ancelotti"]],["Rivalità eterna",4,["José Mourinho","Pep Guardiola"]],["Calcio totale",4,["Johan Cruijff","Pep Guardiola"]],["Scuola britannica",4,["Alex Ferguson","Jürgen Klopp"]]],
+parigi:[["Arte a cielo aperto",5,["Museo del Louvre","Musée d'Orsay","Orangerie e le Ninfee di Monet"]],["Cartolina classica",4,["Torre Eiffel","Arco di Trionfo","Champs-Élysées"]],["Parigi medievale",5,["Cattedrale di Notre-Dame","Sainte-Chapelle","Île de la Cité"]],["Bohème",4,["Montmartre e Sacré-Cœur","Moulin Rouge e Pigalle"]],["Pausa verde",3,["Giardini del Lussemburgo","Parc des Buttes-Chaumont"]]],
+francese:[["Bistrot parigino",4,["Entrecôte con patatine","Crème brûlée"]],["Pasticceria",5,["Macaron","Éclair al cioccolato","Mille-feuille"]],["Serata savoiarda",5,["Raclette","Camembert al forno","Plateau di formaggi"]],["Cucina contadina",5,["Boeuf bourguignon","Coq au vin","Cassoulet"]]],
+cloud:[["Serverless",7,["AWS Lambda","Amazon API Gateway","Amazon DynamoDB"]],["Sicurezza",5,["AWS IAM","Amazon VPC","Amazon Cognito"]],["Il trio base",6,["Amazon EC2","Amazon S3","Amazon RDS"]],["Container",5,["Amazon ECS","Amazon EKS","AWS Fargate"]],["Messaggistica",4,["Amazon CloudWatch","Amazon SNS","Amazon SQS"]],["Dominio e CDN",4,["Amazon Route 53","Amazon CloudFront"]]],
+ai:[["Immagini e video",5,["Midjourney","Sora","Runway"]],["Coding assistito",5,["GitHub Copilot","Cursor","v0"]],["Voce e musica",5,["ElevenLabs","Suno","Whisper"]],["Ricerca",3,["Perplexity","NotebookLM"]],["Automazione",3,["Zapier","n8n"]],["Open source",5,["Llama","Stable Diffusion","Hugging Face"]]],
+libri:[["Distopie",4,["1984","Fahrenheit 451"]],["Epica",5,["Il Signore degli Anelli","Dune","Fondazione"]],["Classici italiani",5,["Il Gattopardo","I promessi sposi","La Divina Commedia"]],["Mente e storia",4,["Sapiens","Pensare, veloce e lento"]],["Strategia",4,["Il Principe","L'arte della guerra"]],["Mistero",4,["Il nome della rosa","Il pendolo di Foucault","Il codice da Vinci"]],["Il mare",3,["Il vecchio e il mare","Moby Dick"]]],
+cda:[["Padri della Silicon Valley",5,["Steve Jobs","Bill Gates","Mark Zuckerberg"]],["Era AI",5,["Sam Altman","Jensen Huang","Elon Musk"]],["Made in Italy",5,["Giorgio Armani","Leonardo Del Vecchio","Brunello Cucinelli"]],["Motori",5,["Enzo Ferrari","Ferruccio Lamborghini","Sergio Marchionne"]],["Show business",4,["Walt Disney","Oprah Winfrey","Richard Branson"]],["Alta moda",3,["Coco Chanel","Giorgio Armani"]]],
+italia:[["Triangolo d'oro",6,["Roma","Firenze","Venezia"]],["Sud che sa vivere",4,["Napoli","Palermo","Lecce"]],["Mare e luce",5,["Cinque Terre","Capri","Sorrento e Costiera Amalfitana"]],["Toscana e Umbria",4,["Siena","Pisa","Perugia"]],["Nord elegante",3,["Milano","Lago di Como"]]],
+tapas:[["Fritto misto",5,["Croquetas","Calamares fritos","Patatas bravas"]],["Tavola classica",5,["Tortilla de patatas","Jamón ibérico","Pan con tomate"]],["Dal mare",5,["Gambas al ajillo","Pulpo a la gallega","Boquerones en vinagre"]],["Dolce finale",4,["Churros con cioccolata","Crema catalana"]],["Estate fredda",3,["Gazpacho","Salmorejo"]],["Formaggi",3,["Queso manchego","Queso con membrillo"]]],
+playlist:[["Colonna di Rocky",4,["Eye of the Tiger","Gonna Fly Now"]],["Hip hop",5,["Lose Yourself","Till I Collapse","Sicko Mode"]],["Cori da stadio",5,["Seven Nation Army","Don't Stop Me Now","The Final Countdown"]],["Rock duro",5,["Thunderstruck","Enter Sandman","Welcome to the Jungle"]],["Dance",4,["Harder, Better, Faster, Stronger","Titanium","Blinding Lights"]],["Kanye",3,["Stronger","Power"]]],
+stadi:[["Spagna",5,["Camp Nou","Santiago Bernabéu","Mestalla"]],["Italia",5,["San Siro","Stadio Olimpico di Roma","Stadio Diego Armando Maradona"]],["Premier League",5,["Old Trafford","Anfield","Wembley"]],["Sudamerica",5,["Maracanã","La Bombonera","Estadio Monumental"]],["Germania",4,["Allianz Arena","Signal Iduna Park"]],["Londra",4,["Wembley","Emirates Stadium","Stamford Bridge"]]],
+club:[["Derby d'Italia",4,["Juventus","Inter"]],["Derby della Madonnina",4,["Inter","Milan"]],["El Clásico",4,["Real Madrid","Barcellona"]],["Regine d'Europa",5,["Real Madrid","Bayern Monaco","Liverpool"]],["Premier League",4,["Liverpool","Manchester City","Arsenal"]],["Sudamerica",3,["Boca Juniors","Flamengo"]]],
+cantina:[["Re del Nebbiolo",5,["Barolo","Barbaresco"]],["Bollicine",5,["Champagne","Franciacorta","Prosecco"]],["Toscana",5,["Chianti Classico","Brunello di Montalcino","Sassicaia"]],["Francia",5,["Bordeaux rosso","Borgogna Pinot Noir","Sauternes"]],["Bianchi freschi",4,["Vermentino","Gavi","Sauvignon Blanc"]],["Sud",4,["Primitivo di Manduria","Nero d'Avola","Etna Rosso"]]],
+tech:[["Ecosistema Apple",5,["iPhone","MacBook Pro","AirPods Pro"]],["Console",5,["PlayStation 5","Nintendo Switch","Steam Deck"]],["Creator",5,["GoPro","Drone DJI","Fujifilm X100"]],["Smart working",5,["Monitor ultrawide","Tastiera meccanica","Logitech MX Master"]],["Lettura",3,["Kindle","Cuffie Sony WH-1000XM"]],["Maker",4,["Raspberry Pi","Stampante 3D"]]],
+eventi:[["Grand Slam",6,["Wimbledon","Roland Garros","US Open di tennis"]],["Motori",5,["Gran Premio di Monaco","Gran Premio di Monza","MotoGP al Mugello"]],["Ciclismo",4,["Tour de France","Giro d'Italia"]],["Derby infuocati",4,["Clásico Real-Barça","Derby della Madonnina"]],["America",4,["Super Bowl","Finale NBA","Maratona di New York"]],["Il calcio che conta",4,["Finale di Champions League","Mondiali di calcio"]]],
+f1:[["Rivalità eterna",5,["Ayrton Senna","Alain Prost"]],["Rossa",5,["Michael Schumacher","Niki Lauda","Gilles Villeneuve"]],["Re del nuovo secolo",5,["Lewis Hamilton","Max Verstappen","Sebastian Vettel"]],["Nuova generazione",4,["Charles Leclerc","Lando Norris","Oscar Piastri"]],["Anni 70",5,["Niki Lauda","James Hunt","Jackie Stewart"]],["Compagni di box",4,["Lewis Hamilton","Nico Rosberg"]]],
+tennis:[["Big Three",6,["Roger Federer","Rafael Nadal","Novak Djokovic"]],["Nuova Italia",5,["Jannik Sinner","Lorenzo Musetti","Matteo Berrettini"]],["Anni 90",4,["Andre Agassi","Pete Sampras"]],["Rivalità storica",4,["Björn Borg","John McEnroe"]],["Regine",5,["Serena Williams","Steffi Graf","Martina Navratilova"]],["Coppa Davis azzurra",4,["Adriano Panatta","Nicola Pietrangeli"]],["Il futuro è adesso",5,["Jannik Sinner","Carlos Alcaraz"]]],
+animazione:[["Pixar classica",5,["Toy Story","Alla ricerca di Nemo","Gli Incredibili"]],["Studio Ghibli",6,["Il mio vicino Totoro","La città incantata","Il castello errante di Howl"]],["Disney anni 90",5,["Aladdin","La Bella e la Bestia","Il Re Leone"]],["Cuore in mano",5,["Up","Inside Out","Coco"]],["Risate",3,["Kung Fu Panda","Madagascar"]]],
+tavolo:[["Strategia",5,["Catan","Risiko","Ticket to Ride"]],["Carte italiane",5,["Scopa","Briscola","Tressette"]],["Mente fredda",4,["Scacchi","Dama","Backgammon"]],["Party game",4,["Taboo","Codenames","Cards Against Humanity"]],["Eurogame",4,["Azul","7 Wonders","Splendor"]]],
+case:[["Lusso totale",5,["Isola privata","Bungalow alle Maldive","Palazzo a Venezia"]],["Montagna",5,["Baita in montagna","Chalet a Cortina","Cabin in Canada"]],["Italia rurale",5,["Trullo in Puglia","Villa in Toscana","Dammuso a Pantelleria"]],["Città che non dorme",5,["Attico a Parigi","Loft a New York","Appartamento a Lisbona"]],["Avventura",4,["Barca a vela","Camper vintage","Casa sull'albero"]],["Estremo nord",4,["Castello in Scozia","Igloo in Lapponia","Faro sulla scogliera"]]],
+band:[["Power trio",5,["Chitarra elettrica","Basso","Batteria"]],["Rock band completa",4,["Chitarra elettrica","Basso","Batteria","Voce solista"]],["Orchestra da camera",5,["Violino","Violoncello","Contrabbasso"]],["Jazz club",5,["Sassofono","Tromba","Pianoforte"]],["Elettronica",4,["Console da DJ","Sintetizzatore"]],["Falò in spiaggia",3,["Chitarra acustica","Ukulele","Bongo"]],["Orecchie in pericolo",-3,["Kazoo","Cornamusa"]]],
+mestieri:[["Tutto sulla tavola",5,["Chef stellato","Sommelier","Vignaiolo"]],["Cielo",4,["Pilota di aerei","Astronauta"]],["Bordocampo",4,["Allenatore di Serie A","Commentatore sportivo"]],["Creativi",5,["Scrittore","Regista","Fotografo di viaggio"]],["Avventura",5,["Guida alpina","Skipper","Surfista professionista"]],["Mente",4,["Ricercatore di intelligenza artificiale","Maestro di scacchi"]],["Palco digitale",3,["DJ","Streamer"]]],
+poteri:[["Signore del tempo",6,["Fermare il tempo","Viaggiare nel tempo","Prevedere il futuro"]],["Mente superiore",5,["Leggere nel pensiero","Telecinesi","Memoria perfetta"]],["Madre natura",5,["Parlare con gli animali","Controllare il meteo","Controllare il fuoco"]],["Fuga perfetta",5,["Invisibilità","Teletrasporto","Attraversare i muri"]],["Immortale",3,["Guarigione rapida","Super forza"]],["Colpo di fortuna",4,["Fortuna infinita","Duplicare oggetti","Clonarsi"]]],
+street:[["America Latina",5,["Tacos al pastor","Arepas","Empanadas"]],["Oriente",5,["Ramen","Takoyaki","Dim sum"]],["Italia in strada",5,["Arancino","Lampredotto","Pizza al taglio"]],["Mediterraneo",4,["Falafel","Kebab","Gyros"]],["Dolci da passeggio",4,["Waffle belga","Crêpe alla Nutella","Churros"]],["Nord America",4,["Hamburger","Hot dog di New York","Poutine"]]],
+isole:[["Italia isolana",5,["Sardegna","Sicilia","Capri"]],["Cicladi e dintorni",4,["Santorini","Mykonos","Creta"]],["Baleari",5,["Ibiza","Formentera","Maiorca"]],["Paradiso tropicale",5,["Maldive","Seychelles","Mauritius"]],["Atlantico",3,["Madeira","Tenerife"]],["Piccole perle",4,["Procida","Lampedusa","Elba"]]],
+hobby:[["Sport e mente",5,["Palestra","Yoga","Meditazione"]],["Dall'orto alla tavola",4,["Cucinare","Giardinaggio","Orto urbano"]],["Creativi",4,["Disegno","Fotografia","Ceramica"]],["All'aria aperta",4,["Trekking","Campeggio","Birdwatching"]],["Nerd",5,["Videogiochi","Programmare","Scacchi"]],["Acqua",4,["Pesca","Vela","Nuoto"]]]
+};
+var SLOTS=5,START=20,SKIPS=2;
+
+var S={screen:'home',names:['Giocatore 1','Giocatore 2'],cat:null,deck:[],i:0,pl:[],turn:0,price:1,hist:[],night:{done:{},wins:[0,0]},res:null};
+try{
+  var sv=JSON.parse(localStorage.getItem('astadraft')||'null');
+  if(sv){S.names=sv.names||S.names;S.night=sv.night||S.night;}
+}catch(e){}
+function save(){try{localStorage.setItem('astadraft',JSON.stringify({names:S.names,night:S.night}));}catch(e){}}
+
+var app=document.getElementById('app');
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function nm(p){return (S.names[p]||'').trim()||('Giocatore '+(p+1));}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function mk(){return {budget:START,picks:[],skips:SKIPS};}
+function full(p){return S.pl[p].picks.length>=SLOTS;}
+function maxP(p){var q=S.pl[p];var left=SLOTS-q.picks.length;if(left<=0)return 0;return Math.max(0,q.budget-(left-1));}
+function maxBoth(){return Math.max(maxP(0),maxP(1));}
+function stars(n){return '★'.repeat(n)+'☆'.repeat(5-n);}
+
+function start(id){
+  var c=BY[id];
+  S.cat=id;S.deck=shuffle(c.items);S.i=0;S.pl=[mk(),mk()];
+  S.turn=Math.random()<.5?0:1;S.price=1;S.hist=[];S.res=null;S.screen='auction';
+  render();window.scrollTo(0,0);
+}
+function snap(){S.hist.push(JSON.stringify({pl:S.pl,i:S.i,turn:S.turn,price:S.price}));}
+function undo(){
+  if(!S.hist.length)return;
+  var o=JSON.parse(S.hist.pop());S.pl=o.pl;S.i=o.i;S.turn=o.turn;S.price=o.price;render();
+}
+function advance(){
+  S.turn=1-S.turn;
+  if(full(S.turn))S.turn=1-S.turn;
+  S.price=Math.max(1,Math.min(S.price,maxBoth()));
+  if((full(0)&&full(1))||S.i>=S.deck.length){finish();return;}
+  render();
+}
+function assign(p){
+  var it=S.deck[S.i];if(!it||full(p)||S.price<1||S.price>maxP(p))return;
+  snap();
+  var before=comboList(p).length;
+  S.pl[p].picks.push({name:it.name,stars:it.stars,price:S.price});
+  S.pl[p].budget-=S.price;
+  var after=comboList(p),msg=it.name+' a '+nm(p)+' per €'+S.price;
+  if(after.length>before){var nw=after.slice(before);msg+=' · '+nw.map(function(c){return (c.bonus<0?'Maledizione: ':'Combo d\'oro: ')+c.name+' ('+(c.bonus>0?'+':'')+c.bonus+')';}).join(', ');}
+  toast(msg,after.length>before?3200:1700);
+  S.i++;S.price=1;advance();
+}
+function skip(){
+  var q=S.pl[S.turn];if(q.skips<1||full(S.turn))return;
+  snap();q.skips--;S.i++;S.price=1;toast('Skip di '+nm(S.turn));advance();
+}
+function comboList(p,catId){
+  var have={};S.pl[p].picks.forEach(function(k){have[k.name]=1;});
+  return (COMBOS[catId||S.cat]||[]).filter(function(c){return c[2].every(function(n){return have[n];});})
+    .map(function(c){return {name:c[0],bonus:c[1],items:c[2]};});
+}
+function score(p){
+  var q=S.pl[p];var fame=q.picks.reduce(function(a,b){return a+b.stars;},0);
+  var cb=comboList(p);var bonus=cb.reduce(function(a,b){return a+b.bonus;},0);
+  return {fame:fame,combos:cb,bonus:bonus,total:fame+bonus};
+}
+function comboHint(id){
+  var cs=COMBOS[id]||[];var g=cs.filter(function(c){return c[1]>0;}).length,b=cs.length-g;
+  return g+' combo d\'oro nascoste'+(b?' e '+b+(b===1?' maledizione':' maledizioni'):'');
+}
+function finish(){
+  var a=score(0),b=score(1);
+  var win=a.total===b.total?-1:(a.total>b.total?0:1);
+  var all=[];
+  [0,1].forEach(function(p){S.pl[p].picks.forEach(function(k){all.push({p:p,k:k});});});
+  var deal=all.slice().sort(function(x,y){return (y.k.stars/y.k.price)-(x.k.stars/x.k.price)||y.k.stars-x.k.stars;})[0];
+  var flop=all.slice().sort(function(x,y){return (x.k.stars/x.k.price)-(y.k.stars/y.k.price)||y.k.price-x.k.price;})[0];
+  S.res={a:a,b:b,win:win,deal:deal,flop:flop};
+  var prev=S.night.done[S.cat];
+  if(prev&&prev.win>=0)S.night.wins[prev.win]--;
+  S.night.done[S.cat]={win:win};
+  if(win>=0)S.night.wins[win]++;
+  save();S.screen='result';render();window.scrollTo(0,0);
+  confetti(win);
+}
+
+/* views */
+function homeView(){
+  var w=S.night.wins,n=Object.keys(S.night.done).length;
+  var tiles=CATS.map(function(c,i){
+    var d=S.night.done[c.id];
+    var tag=d?(d.win>=0?'<span class="win"><i class="d'+d.win+'"></i>'+esc(nm(d.win))+'</span>':'<span class="win">Pari</span>'):'';
+    return '<button class="tile" data-act="start" data-id="'+c.id+'" style="--h:'+c.h+'">'+
+      '<span><span class="tile-name">'+esc(c.name)+'</span></span>'+
+      '<span class="tile-scen">'+esc(c.scen)+'</span>'+
+      '<span class="tile-meta"><span>'+c.items.length+' voci</span>'+tag+'</span></button>';
+  }).join('');
+  return '<div class="hero"><div class="eyebrow">Draft all\'asta</div><h1>Draftino?</h1>'+
+    '<p>Scegli uno scenario, battete le voci una alla volta e costruite la squadra migliore.</p></div>'+
+    '<div class="rules"><span class="chip">€20 a testa</span><span class="chip">5 scelte</span><span class="chip">2 skip</span><span class="chip">min. €1 a voce</span><span class="chip">combo d\'oro</span></div>'+
+    '<div class="card names"><label><span class="eyebrow"><i class="dot d0"></i>Giocatore 1</span><input id="n0" value="'+esc(S.names[0])+'" maxlength="18" autocomplete="off"></label>'+
+    '<label><span class="eyebrow"><i class="dot d1"></i>Giocatore 2</span><input id="n1" value="'+esc(S.names[1])+'" maxlength="18" autocomplete="off"></label></div>'+
+    '<div class="card night"><div><div class="eyebrow">Classifica della serata</div><div class="progress">'+n+' di '+CATS.length+' scenari giocati</div></div>'+
+    '<div class="score num"><span class="a">'+w[0]+'</span><span>-</span><span class="b">'+w[1]+'</span></div></div>'+
+    '<div class="grid"><button class="tile mys" data-act="mystery"><span class="tile-name">Categoria misteriosa</span><span class="tile-scen">Lo scenario lo sceglie il caso, tra tutti quelli che non avete ancora giocato.</span><span class="tile-meta"><span>?</span><span>'+CATS.length+' scenari in gioco</span></span></button>'+tiles+'</div>';
+}
+function auctionView(){
+  var c=BY[S.cat],it=S.deck[S.i],t=S.turn;
+  var mx=[maxP(0),maxP(1)],mb=maxBoth();
+  var panels=[0,1].map(function(p){
+    var q=S.pl[p];
+    var slots='';for(var k=0;k<SLOTS;k++)slots+='<span class="slot'+(k<q.picks.length?' on':'')+'"></span>';
+    return '<div class="pl'+(t===p?' turn':'')+'" style="--c:var(--p'+(p+1)+')">'+
+      '<div class="pl-name">'+esc(nm(p))+'</div>'+
+      '<div class="pl-bud num">€'+q.budget+'</div>'+
+      '<div class="bar"><i style="width:'+(q.budget/START*100)+'%"></i></div>'+
+      '<div class="slots">'+slots+'</div>'+
+      '<div class="pl-foot"><span>'+q.picks.length+'/'+SLOTS+' scelte</span><span>Skip '+q.skips+'</span></div></div>';
+  }).join('');
+  var chips=[1,2,3,5,8].map(function(v){
+    return '<button data-act="price" data-v="'+v+'" class="'+(S.price===v?'sel':'')+'"'+(v>mb?' disabled':'')+'>€'+v+'</button>';
+  }).join('');
+  var teams=[0,1].map(function(p){
+    var q=S.pl[p],li='';
+    for(var k=0;k<SLOTS;k++){
+      var x=q.picks[k];
+      li+=x?'<li><span>'+esc(x.name)+'</span><span class="num">€'+x.price+'</span></li>':'<li class="empty"><span>Libero</span><span>-</span></li>';
+    }
+    return '<div class="team"><h3><i class="dot d'+p+'"></i>'+esc(nm(p))+'</h3><ol>'+li+'</ol></div>';
+  }).join('');
+  var sk=S.pl[t].skips;
+  return '<div class="topbar"><button class="ghost" data-act="home">Esci</button><h2>'+esc(c.name)+'</h2>'+
+    '<button class="ghost" data-act="undo"'+(S.hist.length?'':' disabled')+'>Annulla</button></div>'+
+    '<div class="players">'+panels+'</div>'+
+    '<div class="block" style="--c:var(--p'+(t+1)+');--on:var(--on-p'+(t+1)+')">'+
+      '<div class="progress">'+esc(c.scen)+' · voce '+(S.i+1)+' di '+S.deck.length+'</div>'+
+      '<div class="hint">'+esc(comboHint(S.cat))+'</div>'+
+      '<div class="banner">Tocca a '+esc(nm(t))+': punta o skippa</div>'+
+      '<div class="item" id="it'+S.i+'">'+esc(it.name)+'</div>'+
+      '<div class="stepper"><button class="step" data-act="minus" aria-label="Meno 1 euro"'+(S.price<=1?' disabled':'')+'>−</button>'+
+        '<div class="price num">€'+S.price+'</div>'+
+        '<button class="step" data-act="plus" aria-label="Più 1 euro"'+(S.price>=mb?' disabled':'')+'>+</button></div>'+
+      '<div class="quick">'+chips+'</div>'+
+      '<div class="assign">'+
+        '<button class="btn b0" data-act="assign" data-p="0"'+((full(0)||S.price>mx[0])?' disabled':'')+'>Assegna a '+esc(nm(0))+'<small>'+(full(0)?'squadra piena':'max €'+mx[0])+'</small></button>'+
+        '<button class="btn b1" data-act="assign" data-p="1"'+((full(1)||S.price>mx[1])?' disabled':'')+'>Assegna a '+esc(nm(1))+'<small>'+(full(1)?'squadra piena':'max €'+mx[1])+'</small></button>'+
+      '</div>'+
+      '<button class="btn skip" data-act="skip"'+(sk<1?' disabled':'')+'>Skip di '+esc(nm(t))+'<small>'+(sk<1?'finiti':sk+' rimasti')+'</small></button>'+
+    '</div>'+
+    '<div class="teams">'+teams+'</div>';
+}
+function resultView(){
+  var c=BY[S.cat],r=S.res;
+  var w=r.win;
+  var head=w<0?'<div class="crown" style="--c:var(--surface2);--on:var(--ink)">Pareggio</div>':
+    '<div class="crown" style="--c:var(--p'+(w+1)+');--on:var(--on-p'+(w+1)+')">Vince '+esc(nm(w))+'</div>';
+  var d=0;
+  var teams=[0,1].map(function(p){
+    var sc=p===0?r.a:r.b;
+    var rows=S.pl[p].picks.map(function(k){
+      var del=(d++*0.22).toFixed(2)+'s';
+      return '<div class="row" style="--d:'+del+'"><b>'+esc(k.name)+'</b><span class="stars">'+stars(k.stars)+'</span><small class="num">pagato €'+k.price+'</small><small></small></div>';
+    }).join('');
+    var cb=sc.combos.map(function(c){
+      var del=(d++*0.22).toFixed(2)+'s';
+      return '<div class="combo '+(c.bonus<0?'curse':'gold')+'" style="--d:'+del+'"><span class="cn"><b>'+(c.bonus<0?'Maledizione: ':'Combo d\'oro: ')+esc(c.name)+'</b><small>'+esc(c.items.join(' + '))+'</small></span><span class="pts num">'+(c.bonus>0?'+':'')+c.bonus+'</span></div>';
+    }).join('');
+    return '<div class="rteam" style="--c:var(--p'+(p+1)+')"><div class="rteam-head"><h3>'+esc(nm(p))+'</h3><div class="rteam-score num">'+sc.total+'</div></div>'+
+      rows+(cb?'<div class="combos">'+cb+'</div>':'')+'<div class="sum num">Voto del banco '+sc.fame+(sc.combos.length?(sc.bonus<0?' − ':' + ')+'combo '+Math.abs(sc.bonus):'')+'</div></div>';
+  }).join('');
+  var badges='';
+  if(r.deal)badges+='<div class="badge"><div class="eyebrow">Affare della serata</div><b>'+esc(r.deal.k.name)+'</b><span>'+esc(nm(r.deal.p))+' lo prende a €'+r.deal.k.price+' ('+r.deal.k.stars+' stelle)</span></div>';
+  if(r.flop&&(!r.deal||r.flop!==r.deal))badges+='<div class="badge"><div class="eyebrow">Spesa azzardata</div><b>'+esc(r.flop.k.name)+'</b><span>'+esc(nm(r.flop.p))+' paga €'+r.flop.k.price+' per '+r.flop.k.stars+' stelle</span></div>';
+  var wn=S.night.wins;
+  var missed=(COMBOS[S.cat]||[]).filter(function(c){return c[1]>0&&!comboList(0).concat(comboList(1)).some(function(x){return x.name===c[0];});}).slice(0,4);
+  var miss=missed.length?'<div class="card"><div class="eyebrow">Combo d\'oro sfuggite</div><div class="missed">'+missed.map(function(c){return '<div><b>'+esc(c[0])+' (+'+c[1]+')</b><small>'+esc(c[2].join(' + '))+'</small></div>';}).join('')+'</div></div>':'';
+  return '<div class="verdict"><div class="eyebrow">'+esc(c.name)+'</div><h1>Verdetto</h1>'+head+'</div>'+
+    '<div class="rteams">'+teams+'</div>'+
+    '<div class="badges">'+badges+'</div>'+miss+
+    '<div class="card night"><div class="eyebrow">Classifica della serata</div><div class="score num"><span class="a">'+wn[0]+'</span><span>-</span><span class="b">'+wn[1]+'</span></div></div>'+
+    '<div class="cta"><button class="btn main" data-act="home">Prossimo scenario</button><button class="btn alt" data-act="again">Rigioca questo scenario</button></div>';
+}
+function render(){
+  app.innerHTML=S.screen==='home'?homeView():S.screen==='auction'?auctionView():resultView();
+}
+
+/* extras */
+function toast(msg,ms){
+  var o=document.querySelector('.toast');if(o)o.remove();
+  var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove();},ms||1700);
+}
+function confetti(win){
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var cv=document.getElementById('confetti');if(!cv||!cv.getContext)return;
+  var cs=getComputedStyle(document.documentElement);
+  var cols=[cs.getPropertyValue('--p1'),cs.getPropertyValue('--p2'),cs.getPropertyValue('--accent'),cs.getPropertyValue('--good')];
+  if(win>=0)cols=[cs.getPropertyValue(win===0?'--p1':'--p2'),cs.getPropertyValue('--accent'),cs.getPropertyValue('--good'),cs.getPropertyValue(win===0?'--p1':'--p2')];
+  cv.hidden=false;cv.width=innerWidth;cv.height=innerHeight;
+  var x=cv.getContext('2d'),P=[];
+  for(var i=0;i<110;i++)P.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:5+Math.random()*6,c:cols[i%cols.length].trim()||'#fff',r:Math.random()*6});
+  var f=0;
+  (function tick(){
+    x.clearRect(0,0,cv.width,cv.height);
+    P.forEach(function(p){p.x+=p.vx;p.y+=p.vy;p.r+=.15;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6);x.restore();});
+    if(++f<150)requestAnimationFrame(tick);else{x.clearRect(0,0,cv.width,cv.height);cv.hidden=true;}
+  })();
+}
+
+function mystery(){
+  var pool=CATS.filter(function(c){return !S.night.done[c.id];});
+  if(!pool.length)pool=CATS;
+  var pick=pool[Math.floor(Math.random()*pool.length)];
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var ov=document.createElement('div');ov.className='shuf';
+  ov.innerHTML='<div class="eyebrow">Categoria misteriosa</div><div class="shuf-name" id="shufname">?</div>';
+  document.body.appendChild(ov);
+  var el=ov.querySelector('#shufname'),n=0,total=reduce?1:16;
+  (function tick(){
+    var c=n>=total?pick:CATS[Math.floor(Math.random()*CATS.length)];
+    el.textContent=c.name;n++;
+    if(n<=total)setTimeout(tick,60+n*14);
+    else setTimeout(function(){ov.remove();start(pick.id);},650);
+  })();
+}
+
+/* events */
+app.addEventListener('click',function(e){
+  var b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  var a=b.dataset.act;
+  if(a==='start')start(b.dataset.id);
+  else if(a==='home'){S.screen='home';render();window.scrollTo(0,0);}
+  else if(a==='again')start(S.cat);
+  else if(a==='mystery')mystery();
+  else if(a==='undo')undo();
+  else if(a==='skip')skip();
+  else if(a==='assign')assign(+b.dataset.p);
+  else if(a==='minus'){S.price=Math.max(1,S.price-1);render();}
+  else if(a==='plus'){S.price=Math.min(maxBoth(),S.price+1);render();}
+  else if(a==='price'){S.price=Math.min(+b.dataset.v,maxBoth());render();}
+});
+app.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='n0'||t.id==='n1'){S.names[t.id==='n0'?0:1]=t.value;save();}
+});
+render();
+</script>
+
+</body></html>
